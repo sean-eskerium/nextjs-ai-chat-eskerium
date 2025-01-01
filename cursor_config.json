@@ -1,0 +1,181 @@
+{
+    "general": {
+      "description": "This configuration is for a Vercel based project using Postgre with Neon as the host with specific local development requirements, an agent-based architecture, and safety measures.",
+      "safety": {
+        "confirm_destructive_commands": true,
+        "dry_run_default": true,
+        "prevent_workspace_change": true,
+        "require_full_analysis": true,
+        "analysis_requirements": {
+          "trace_data_flow": "Always trace the complete data flow from source to destination before making changes",
+          "verify_dependencies": "Check all files that import or depend on the file being modified",
+          "edge_function_analysis": "Review all related edge functions and their response formats",
+          "component_hierarchy": "Analyze parent-child relationships and prop passing between components",
+          "state_management": "Verify how state changes affect the entire component tree"
+        },
+        "pre_modification_checklist": [
+          "Identify all connected components and services",
+          "Review edge function contracts and response formats",
+          "Check state management implications",
+          "Verify type definitions and interfaces",
+          "Analyze potential side effects",
+          "Review and update affected tests"
+        ]
+      },
+      "sequential_task_flow": true,
+      "documentation_requirements": {
+        "check_docs_directory": true,
+        "required_docs": [
+          "tech_stack_document.md",
+          "system_prompts_document.md",
+          "cursorrules_file.md",
+          "project_requirements_document.md",
+          "tech_stack_document.md",
+          "frontend_architecture_document.md",
+          "file_structure_document.md",
+          "unit-testing.md"
+        ]
+      }
+    },
+    "coding_practices": {
+      "development": {
+        "environment": {
+          "require_confirmation_before_install": true,
+          "preserve_working_setup": true,
+          "backup_config_before_changes": true
+        },
+        "supabase": {
+          "use_docker_hub": true,
+          "preserve_local_config": true,
+          "require_explicit_version": true
+        },
+        "setup": "Guide the user through creating local environment files, such as `.env.local`, distinct from production.",
+        "tasks": [
+          "Install dependencies via package manager (e.g., npm or yarn).",
+          "Set up database schema in Supabase.",
+          "Run a local server for testing purposes."
+        ]
+      },
+      "testing": {
+        "require_verification": true,
+        "prevent_untested_changes": true,
+        "test_driven_development": {
+          "required": true,
+          "workflow": [
+            "Write tests first based on requirements",
+            "Run tests (expect failure)",
+            "Implement the feature",
+            "Run tests (expect success)",
+            "Refactor while maintaining passing tests"
+          ],
+          "coverage_requirements": {
+            "new_code": "90%",
+            "modified_code": "maintain or improve existing coverage"
+          }
+        },
+        "unit_tests": {
+          "framework": "jest",
+          "coverage": true,
+          "mocked_dependencies": true,
+          "instructions": "Use Jest for testing agents, ensuring mocks are used for external integrations like Supabase and Pinecone.",
+          "update_requirements": [
+            "Update tests before modifying code",
+            "Add tests for new functionality",
+            "Modify tests to reflect changed requirements",
+            "Never delete tests without thorough analysis"
+          ]
+        }
+      },
+      "architecture": {
+        "modules": {
+          "Agents": "Each agent is a standalone module with clear input-output behavior.",
+          "MainAssistant": "Coordinates with specialized agents and acts as the user interface.",
+          "Separation of Concerns": "Modules must not tightly couple with others."
+        },
+        "change_management": {
+          "require_full_analysis": true,
+          "analysis_steps": [
+            "Map all affected components and their relationships",
+            "Document data flow through the system",
+            "Identify potential side effects",
+            "Verify type safety across boundaries",
+            "Check edge function contracts",
+            "Review and update affected tests"
+          ],
+          "verification_required": true
+        }
+      }
+    },
+    "context": {
+      "project_type": "supabase_local_development",
+      "critical_files": [
+        ".env",
+        ".env.local",
+        "supabase/config.toml",
+        "package.json",
+        "__tests__/config/setup.ts"
+      ],
+      "protected_directories": [
+        "supabase",
+        "src",
+        "__tests__"
+      ],
+      "analysis_required_paths": [
+        "src/agents",
+        "src/components",
+        "supabase/functions",
+        "src/types",
+        "src/services",
+        "__tests__"
+      ]
+    },
+    "error_handling": {
+      "on_command_failure": "Provide context-aware recovery steps, including verification commands before proceeding.",
+      "misconfigurations": "Suggest automated fixes or reference clear documentation."
+    },
+    "examples": [
+      {
+        "task": "Set up a new agent module",
+        "commands": [
+          "Create test file in `__tests__/agents` directory",
+          "Write tests based on requirements",
+          "Create a new folder in the `src/agents` directory",
+          "Define the input/output contract in `index.ts`",
+          "Implement until tests pass"
+        ],
+        "validation": "Ensure all new modules pass Jest tests with 90%+ coverage before integration."
+      },
+      {
+        "task": "Edit environment-specific configurations",
+        "instructions": [
+          "Modify `.env.local` for development, `.env.test` for tests, and ensure `.env.production` remains unaltered.",
+          "Verify changes by running `node scripts/verifyEnv.js`."
+        ]
+      },
+      {
+        "task": "Modify component behavior",
+        "analysis_required": true,
+        "steps": [
+          "Review and update affected tests first",
+          "Map component relationships and data flow",
+          "Review edge function contracts",
+          "Check state management implications",
+          "Verify type safety",
+          "Document changes in analysis",
+          "Implement changes while maintaining passing tests"
+        ]
+      },
+      {
+        "task": "Create new API route",
+        "steps": [
+          "Create test file in `__tests__/app/api`",
+          "Write tests for success and error cases",
+          "Mock required dependencies",
+          "Create route file",
+          "Implement route handler",
+          "Verify tests pass with good coverage"
+        ]
+      }
+    ]
+  }
+  

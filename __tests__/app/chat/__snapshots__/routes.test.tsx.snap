@@ -1,0 +1,12 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Chat Routes Chat ID Route loads existing chat 1`] = `
+<div>
+  <div
+    data-testid="chat-component"
+  />
+  <div
+    data-testid="data-stream-handler"
+  />
+</div>
+`;

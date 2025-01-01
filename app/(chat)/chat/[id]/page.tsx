@@ -14,7 +14,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   const chat = await getChatById({ id });
 
   if (!chat) {
-    notFound();
+    return notFound();
   }
 
   const session = await auth();
