@@ -1,201 +1,253 @@
-# Fuse React Integration Refactor Plan
+# Fuse React Integration Migration Plan
 
-## Current Structure Analysis
+## 1. Analysis of Current State
 
-### Core Areas
-1. App Directory (Next.js App Router)
-   - Chat routes and pages
-   - Auth routes
-   - API routes
-   - Server actions
+### Chat App (Current Workspace)
+- Next.js 13+ App Router based application
+- Core functionality: AI Chat interface
+- Current structure follows standard Next.js conventions
+- Uses modern features like server components and server actions
 
-2. Components
-   - UI components
-   - Feature components
-   - Layout components
+### Fuse React Template
+- Comprehensive UI framework with established patterns
+- Rich component library and theming system
+- Structured `/src` directory with clear separation of concerns
+- Built-in authentication and state management
 
-3. Library Code
-   - Database utilities
-   - Editor utilities
-   - AI integration
-   - General utilities
+## 2. Migration Goals
+- Preserve Chat app functionality
+- Adopt Fuse React's navigation and layout
+- Maintain code quality and testing
+- Zero functionality regression
 
-4. Configuration
-   - Next.js config
-   - TypeScript config
-   - Testing config
-   - Environment variables
+## 3. Directory Structure Integration
 
-## Target Fuse React Structure
-
-### Root Level
+### Target Structure
 ```
 src/
-  app/             # Next.js app directory
-  auth/            # Authentication logic
-  components/      # Shared components
-  hooks/           # React hooks
-  store/           # State management
-  types/           # TypeScript types
-  utils/           # Utility functions
-  configs/         # Configuration files
-  __mocks__/       # Jest mocks
-  __tests__/       # Test files
+  @fuse/          # Fuse core functionality
+  @auth/          # Authentication (merge with existing auth)
+  @i18n/          # Internationalization
+  app/            # Next.js app directory
+    (chat)/       # Chat app routes
+    (auth)/       # Auth routes
+    api/          # API routes
+  components/
+    shared/       # Shared UI components
+    chat/         # Chat-specific components
+    fuse/         # Fuse-specific components
+  contexts/       # React contexts
+  store/          # State management
+  hooks/          # Custom hooks
+  utils/          # Utility functions
+  configs/        # Configuration files
+  styles/         # Global styles
 ```
 
-### Component Organization
-```
-src/components/
-  shared/          # Shared UI components
-  chat/            # Chat-specific components
-  document/        # Document-specific components
-  layout/          # Layout components
-```
+## 4. Migration Phases
 
-## Migration Strategy
-
-### Phase 1: Infrastructure Setup
-1. Create new directory structure
+### Phase 1: Setup and Dependencies
+1. Create new project structure
    ```bash
-   mkdir -p src/{app,auth,components/{shared,chat,document,layout},hooks,store,types,utils,configs}
+   mkdir -p src/{@fuse,@auth,@i18n,app,components/{shared,chat,fuse},contexts,store,hooks,utils,configs,styles}
    ```
 
-2. Move configuration files
-   - Move Jest config to `src/configs`
-   - Update paths in configs
-   - Update import aliases
+2. Merge dependencies
+   - Compare package.json files
+   - Resolve version conflicts
+   - Update build configurations
 
-### Phase 2: Component Migration
+3. Configuration Integration
+   - Merge Next.js configurations
+   - Update TypeScript paths
+   - Combine environment variables
+   - Merge tailwind configurations
+
+### Phase 2: Core Infrastructure Migration
+1. Authentication
+   - Move existing auth to `src/@auth`
+   - Integrate with Fuse auth system
+   - Update auth providers and hooks
+
+2. Layout Integration
+   - Implement Fuse layout system
+   - Create chat-specific layouts
+   - Setup navigation structure
+
+3. State Management
+   - Move existing state to `src/store`
+   - Integrate with Fuse state management
+   - Update store providers
+
+### Phase 3: Component Migration
 1. UI Components
-   - Move from `components/ui` to `src/components/shared`
-   - Update import paths
-   - Run tests to verify
+   - Move shared components to `src/components/shared`
+   - Move chat components to `src/components/chat`
+   - Update component imports
 
-2. Feature Components
-   - Move from `components` to appropriate subdirectories
-   - Update import paths
-   - Run tests to verify
+2. Chat Functionality
+   - Move chat logic to appropriate directories
+   - Update API routes
+   - Preserve server actions
 
-### Phase 3: App Directory Migration
-1. Pages and Routes
-   - Move from `app` to `src/app`
-   - Update import paths
-   - Verify routing still works
+3. Styling Integration
+   - Merge tailwind configurations
+   - Update component styling
+   - Ensure theme compatibility
 
-2. API Routes
-   - Move from `app/api` to `src/app/api`
-   - Update import paths
-   - Test API endpoints
+### Phase 4: Route Migration
+1. Page Structure
+   - Move chat routes to `src/app/(chat)`
+   - Update layout components
+   - Preserve API routes
 
-### Phase 4: Library Code Migration
-1. Utilities
-   - Move from `lib` to `src/utils`
-   - Update import paths
-   - Run tests to verify
+2. API Integration
+   - Move API routes to appropriate structure
+   - Update API handlers
+   - Maintain endpoint functionality
 
-2. Hooks
-   - Move from `hooks` to `src/hooks`
-   - Update import paths
-   - Run tests to verify
+### Phase 5: Testing and Verification
+1. Test Migration
+   - Update test paths
+   - Migrate test utilities
+   - Ensure test coverage
 
-### Phase 5: Test Migration
-1. Test Files
-   - Move from `__tests__` to `src/__tests__`
-   - Update import paths in tests
-   - Update Jest configuration
-   - Run full test suite
+2. Integration Testing
+   - Verify chat functionality
+   - Test navigation flow
+   - Validate authentication
 
-## Import Path Updates
+## 5. Implementation Steps
 
-### 1. Component Imports
-```typescript
-// Old
-import { Button } from '@/components/ui/button'
+### Step 1: Project Setup
+```bash
+# Create directory structure
+mkdir -p src/{@fuse,@auth,@i18n,app/(chat),components/{shared,chat,fuse},contexts,store,hooks,utils,configs,styles}
 
-// New
-import { Button } from '@/components/shared/button'
+# Copy Fuse core files
+cp -r Fuse-React-v13.0.0-nextjs-demo/src/@fuse ./src/
+cp -r Fuse-React-v13.0.0-nextjs-demo/src/@auth ./src/
+cp -r Fuse-React-v13.0.0-nextjs-demo/src/@i18n ./src/
 ```
 
-### 2. Utility Imports
-```typescript
-// Old
-import { db } from '@/lib/db'
-
-// New
-import { db } from '@/utils/db'
-```
-
-### 3. Hook Imports
-```typescript
-// Old
-import { useChat } from '@/hooks/use-chat'
-
-// New
-import { useChat } from '@/hooks/chat/use-chat'
-```
-
-## Testing Strategy During Migration
-
-### 1. Test File Updates
-- Update paths in all test files
-- Update mock imports
-- Update test utilities
-
-### 2. Jest Configuration
-```typescript
-// Update moduleNameMapper in jest.config.ts
-moduleNameMapper: {
-  '^@/(.*)$': '<rootDir>/src/$1',
+### Step 2: Dependencies and Configuration
+1. Merge package.json
+```json
+{
+  "dependencies": {
+    // Existing chat app dependencies
+    // + Fuse React dependencies
+  }
 }
 ```
 
-### 3. Test Running
-- Run tests after each component move
-- Fix failing tests before proceeding
+2. Update Next.js configuration
+```typescript
+// next.config.mjs
+export default {
+  // Merge configurations from both projects
+}
+```
+
+### Step 3: Component Migration
+1. Move components:
+```bash
+# Move chat components
+mv components/chat src/components/chat/
+mv components/ui src/components/shared/
+```
+
+2. Update imports:
+```typescript
+// Old imports
+import { Button } from '@/components/ui/button'
+// New imports
+import { Button } from '@/components/shared/button'
+```
+
+### Step 4: Route Migration
+1. Move pages:
+```bash
+# Move chat routes
+mv app/(chat)/* src/app/(chat)/
+```
+
+2. Update layouts:
+```typescript
+// src/app/(chat)/layout.tsx
+import { FuseLayout } from '@/components/fuse/layout'
+
+export default function ChatLayout({ children }) {
+  return <FuseLayout>{children}</FuseLayout>
+}
+```
+
+## 6. Testing Strategy
+
+### Unit Tests
+- Migrate test files with components
+- Update import paths
 - Maintain test coverage
 
-## Rollback Plan
+### Integration Tests
+- Add new tests for Fuse integration
+- Verify navigation flows
+- Test state management
 
-### 1. Git Strategy
-- Create feature branch for migration
-- Commit after each phase
-- Maintain ability to roll back
+### E2E Tests
+- Update Cypress/Playwright tests
+- Add navigation scenarios
+- Test full user flows
 
-### 2. Backup
-- Backup all configuration files
+## 7. Rollback Strategy
+
+### Git Strategy
+- Create feature branch
+- Commit logical chunks
+- Maintain ability to revert
+
+### Backup
+- Snapshot database
 - Document all changes
-- Keep old structure until verified
+- Version control checkpoints
 
-## Verification Steps
+## 8. Success Criteria
 
-### 1. Component Verification
-- Import resolution
-- Proper rendering
-- Maintained functionality
+### Functionality
+- Chat works as before
+- Navigation is smooth
+- Authentication works
+- State management preserved
 
-### 2. Route Verification
-- Page loading
-- API endpoints
-- Server actions
+### Performance
+- No degradation in load times
+- Efficient bundle sizes
+- Smooth animations
 
-### 3. Build Verification
-- Development build
-- Production build
-- Type checking
+### Code Quality
+- Clean import structure
+- Consistent styling
+- Maintained test coverage
 
-## Success Criteria
+## 9. Post-Migration Tasks
 
-### 1. Functionality
-- All features work as before
-- No regression in behavior
-- All tests passing
+### Documentation
+- Update README
+- Document new structure
+- Update API documentation
 
-### 2. Performance
-- Build size maintained/improved
-- Runtime performance maintained
-- No new bottlenecks
+### Optimization
+- Bundle size analysis
+- Performance monitoring
+- Cache strategy review
 
-### 3. Developer Experience
-- Clear import paths
-- Logical file organization
-- Improved maintainability 
+### Training
+- Team documentation
+- Codebase walkthrough
+- Best practices guide
+
+## Next Steps
+1. Review and approve plan
+2. Set up new project structure
+3. Begin phased migration
+4. Regular testing and verification 

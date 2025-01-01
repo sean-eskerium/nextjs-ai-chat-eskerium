@@ -1,240 +1,322 @@
-# Comprehensive Unit Test Plan for Refactoring
+# Comprehensive Unit Test Plan for Chat App Migration
 
-## Phase 1: Basic Import and Loading Tests
+## 1. Core Component Tests
 
-### 1.1 App Router Components
-1. Pages
-   ```typescript
-   // Test each page component loads
-   import Page from '../app/(chat)/page';
-   import Layout from '../app/(chat)/layout';
-   ```
-
-2. API Routes
-   ```typescript
-   // Test each API route handler loads
-   import { GET, POST } from '../app/(chat)/api/chat/route';
-   ```
-
-3. Server Actions
-   ```typescript
-   // Test server action imports
-   import { createChat } from '../app/(chat)/actions';
-   ```
-
-### 1.2 Component Import Tests
-[Previous component tests remain the same]
-
-### 1.3 Library Code Tests
-1. Database
-   ```typescript
-   // Test database utilities load
-   import { db } from '../lib/db';
-   import * as schema from '../lib/db/schema';
-   ```
-
-2. Editor
-   ```typescript
-   // Test editor utilities load
-   import * as monaco from '../lib/editor/monaco';
-   ```
-
-3. AI Integration
-   ```typescript
-   // Test AI utilities load
-   import * as openai from '../lib/ai/openai';
-   ```
-
-### 1.4 Configuration Tests
-1. Next.js Config
-   ```typescript
-   // Test config loads
-   import config from '../next.config';
-   ```
-
-2. TypeScript Config
-   ```typescript
-   // Test tsconfig paths resolve
-   import { something } from '@/components/ui/button';
-   ```
-
-## Phase 2: Basic Function Accessibility
-
-### 2.1 API Route Functions
-1. Chat API
-   ```typescript
-   // Verify function signatures
-   expect(typeof GET).toBe('function');
-   expect(typeof POST).toBe('function');
-   ```
-
-2. Document API
-   ```typescript
-   // Verify exports
-   expect(typeof createDocument).toBe('function');
-   expect(typeof updateDocument).toBe('function');
-   ```
-
-### 2.2 Server Actions
-1. Chat Actions
-   ```typescript
-   // Verify action accessibility
-   expect(typeof createChat).toBe('function');
-   expect(typeof updateChat).toBe('function');
-   ```
-
-2. Auth Actions
-   ```typescript
-   // Verify auth functions
-   expect(typeof signIn).toBe('function');
-   expect(typeof signOut).toBe('function');
-   ```
-
-### 2.3 Utility Functions
-1. Database Utils
-   ```typescript
-   // Verify DB functions
-   expect(typeof db.query).toBe('function');
-   expect(typeof db.execute).toBe('function');
-   ```
-
-2. AI Utils
-   ```typescript
-   // Verify AI functions
-   expect(typeof generateResponse).toBe('function');
-   ```
-
-## Phase 3: Import Path Testing
-
-### 3.1 Path Resolution Tests
+### 1.1 Chat Component Tree
 ```typescript
-// Test both old and new paths during migration
-describe('Import Paths', () => {
-  it('resolves old paths', () => {
-    expect(() => import('@/components/ui/button')).not.toThrow();
+// Test main chat component and its children
+describe('Chat Component Tree', () => {
+  it('loads Chat component with all dependencies', async () => {
+    const imports = {
+      Chat: () => import('@/components/chat'),
+      ChatHeader: () => import('@/components/chat-header'),
+      Messages: () => import('@/components/messages'),
+      MultimodalInput: () => import('@/components/multimodal-input'),
+      Block: () => import('@/components/block'),
+    };
+    
+    for (const [name, importFn] of Object.entries(imports)) {
+      const module = await importFn();
+      expect(module).toBeDefined();
+      expect(typeof module.default || module[name]).toBe('function');
+    }
   });
+
+  it('renders chat layout structure', () => {
+    const { container } = render(
+      <Chat
+        id="test-id"
+        initialMessages={[]}
+        selectedModelId="test-model"
+        selectedVisibilityType="private"
+        isReadonly={false}
+      />
+    );
+    
+    expect(container.querySelector('.flex.flex-col.min-w-0.h-dvh')).toBeInTheDocument();
+    expect(container.querySelector('form')).toBeInTheDocument();
+  });
+});
+```
+
+### 1.2 State Management
+```typescript
+describe('Chat State Management', () => {
+  it('loads all required hooks', async () => {
+    const hooks = {
+      useChat: () => import('@/hooks/use-chat'),
+      useMessages: () => import('@/hooks/use-messages'),
+      useVotes: () => import('@/hooks/use-votes'),
+    };
+    
+    for (const [name, importFn] of Object.entries(hooks)) {
+      const module = await importFn();
+      expect(module).toBeDefined();
+    }
+  });
+});
+```
+
+## 2. API and Server Action Tests
+
+### 2.1 API Routes
+```typescript
+describe('Chat API Routes', () => {
+  it('loads API route handlers', async () => {
+    const { GET, POST } = await import('@/app/api/chat/route');
+    expect(typeof GET).toBe('function');
+    expect(typeof POST).toBe('function');
+  });
+
+  it('loads server actions', async () => {
+    const actions = await import('@/app/actions');
+    expect(typeof actions.createChat).toBe('function');
+    expect(typeof actions.generateTitleFromUserMessage).toBe('function');
+  });
+});
+```
+
+### 2.2 Database Integration
+```typescript
+describe('Database Integration', () => {
+  it('loads database utilities', async () => {
+    const dbUtils = await import('@/lib/db/queries');
+    const expectedFunctions = [
+      'getChatById',
+      'getMessagesByChatId',
+      'saveChat',
+      'saveMessages',
+    ];
+    
+    expectedFunctions.forEach(fn => {
+      expect(typeof dbUtils[fn]).toBe('function');
+    });
+  });
+});
+```
+
+## 3. UI Component Integration Tests
+
+### 3.1 Layout Integration
+```typescript
+describe('Layout Integration', () => {
+  it('loads layout components', async () => {
+    const layout = await import('@/app/(chat)/layout');
+    expect(typeof layout.default).toBe('function');
+  });
+
+  it('integrates with Fuse layout', () => {
+    const { container } = render(
+      <FuseLayout>
+        <Chat
+          id="test-id"
+          initialMessages={[]}
+          selectedModelId="test-model"
+          selectedVisibilityType="private"
+          isReadonly={false}
+        />
+      </FuseLayout>
+    );
+    
+    expect(container.querySelector('.fuse-layout')).toBeInTheDocument();
+    expect(container.querySelector('.chat-container')).toBeInTheDocument();
+  });
+});
+```
+
+### 3.2 Navigation Integration
+```typescript
+describe('Navigation Integration', () => {
+  it('loads navigation components', async () => {
+    const components = {
+      AppSidebar: () => import('@/components/app-sidebar'),
+      SidebarProvider: () => import('@/components/ui/sidebar'),
+    };
+    
+    for (const [name, importFn] of Object.entries(components)) {
+      const module = await importFn();
+      expect(module).toBeDefined();
+    }
+  });
+});
+```
+
+## 4. Utility Function Tests
+
+### 4.1 AI Integration
+```typescript
+describe('AI Integration', () => {
+  it('loads AI utilities', async () => {
+    const aiUtils = await import('@/lib/ai');
+    expect(typeof aiUtils.customModel).toBe('function');
+  });
+
+  it('loads AI models', async () => {
+    const { models, DEFAULT_MODEL_NAME } = await import('@/lib/ai/models');
+    expect(Array.isArray(models)).toBe(true);
+    expect(typeof DEFAULT_MODEL_NAME).toBe('string');
+  });
+});
+```
+
+### 4.2 Helper Functions
+```typescript
+describe('Helper Functions', () => {
+  it('loads utility functions', async () => {
+    const utils = await import('@/lib/utils');
+    const expectedUtils = [
+      'generateUUID',
+      'convertToUIMessages',
+      'getMostRecentUserMessage',
+    ];
+    
+    expectedUtils.forEach(util => {
+      expect(typeof utils[util]).toBe('function');
+    });
+  });
+});
+```
+
+## 5. Authentication Tests
+
+### 5.1 Auth Integration
+```typescript
+describe('Authentication Integration', () => {
+  it('loads auth utilities', async () => {
+    const { auth } = await import('@/app/(auth)/auth');
+    expect(typeof auth).toBe('function');
+  });
+
+  it('integrates with Fuse auth', async () => {
+    const { container } = render(
+      <FuseAuth>
+        <Chat
+          id="test-id"
+          initialMessages={[]}
+          selectedModelId="test-model"
+          selectedVisibilityType="private"
+          isReadonly={false}
+        />
+      </FuseAuth>
+    );
+    
+    expect(container.querySelector('.fuse-auth')).toBeInTheDocument();
+  });
+});
+```
+
+## 6. Migration Test Utilities
+
+### 6.1 Path Resolution
+```typescript
+// Test helper for verifying import paths
+export const testImportPath = async (oldPath: string, newPath: string) => {
+  let oldModule, newModule;
   
-  it('resolves new paths', () => {
-    expect(() => import('@/components/shared/button')).not.toThrow();
-  });
-});
-```
-
-### 3.2 Alias Resolution
-```typescript
-// Test path aliases work
-describe('Path Aliases', () => {
-  it('resolves @/ alias', () => {
-    expect(() => import('@/utils/something')).not.toThrow();
-  });
-});
-```
-
-## Test Organization
-
-### Directory Structure
-```
-src/__tests__/
-  app/
-    (chat)/
-      page.test.tsx
-      layout.test.tsx
-      api/
-        chat/
-          route.test.ts
-    (auth)/
-      page.test.tsx
-  components/
-    [Previous component tests]
-  lib/
-    db.test.ts
-    ai.test.ts
-  config/
-    next-config.test.ts
-```
-
-### Test Utilities
-```typescript
-// Import test helper
-export const importTest = async (path: string) => {
   try {
-    await import(path);
-    return true;
+    oldModule = await import(oldPath);
   } catch (e) {
-    return false;
+    console.error(`Failed to import from old path: ${oldPath}`);
+    throw e;
   }
-};
-
-// Path resolution helper
-export const resolvePath = (path: string) => {
-  return path.startsWith('@/') 
-    ? path.replace('@/', '../../src/') 
-    : path;
+  
+  try {
+    newModule = await import(newPath);
+  } catch (e) {
+    console.error(`Failed to import from new path: ${newPath}`);
+    throw e;
+  }
+  
+  expect(oldModule).toEqual(newModule);
 };
 ```
 
-## Migration Testing Strategy
-
-### 1. Pre-Migration Tests
-- Run all import tests with current paths
-- Verify all functions are accessible
-- Document current test results
-
-### 2. During Migration
-- Run tests after each file move
-- Update test paths progressively
-- Keep both old and new path tests until migration complete
-
-### 3. Post-Migration
-- Remove old path tests
-- Verify all new paths work
-- Run full test suite
-
-## Test Execution
-
-### Running Tests
-```bash
-# Test current paths
-pnpm test --testPathPattern=current
-
-# Test new paths
-pnpm test --testPathPattern=new
-
-# Test both
-pnpm test
-```
-
-### Debugging
+### 6.2 Component Rendering
 ```typescript
-// Add to jest.config.ts
-{
-  verbose: true,
-  detectOpenHandles: true,
-  logHeapUsage: true
-}
+// Test helper for verifying component rendering
+export const testComponentRender = async (
+  Component: React.ComponentType,
+  props: any,
+  expectedSelectors: string[]
+) => {
+  const { container } = render(<Component {...props} />);
+  
+  expectedSelectors.forEach(selector => {
+    expect(container.querySelector(selector)).toBeInTheDocument();
+  });
+};
 ```
 
-## Success Criteria
+## 7. Test Execution Strategy
 
-### Phase 1
-- All imports resolve successfully
-- No module not found errors
-- All function signatures verified
+### Pre-Migration Tests
+1. Run all component import tests
+2. Verify all API routes are accessible
+3. Test database integration
+4. Document current component tree structure
 
-### Phase 2
-- All functions accessible
-- Correct types exported
-- No undefined exports
+### During Migration
+1. Run path resolution tests after each file move
+2. Verify component rendering in new location
+3. Test integration with Fuse components
+4. Check authentication flow
 
-### Phase 3
-- All new paths resolve
-- No deprecated paths used
-- All aliases working
+### Post-Migration
+1. Run full test suite
+2. Verify all imports use new paths
+3. Test full chat functionality
+4. Validate Fuse integration
 
-## Implementation Notes
+## 8. Error Handling Tests
 
-1. Create test files before moving code
-2. Run tests before and after each move
-3. Keep both path tests until fully migrated
-4. Update paths in batches by component type
-5. Verify each batch before proceeding 
+### 8.1 Import Errors
+```typescript
+describe('Import Error Handling', () => {
+  it('handles missing imports gracefully', async () => {
+    await expect(import('@/non-existent-path')).rejects.toThrow();
+  });
+});
+```
+
+### 8.2 Component Errors
+```typescript
+describe('Component Error Handling', () => {
+  it('handles missing props gracefully', () => {
+    expect(() => render(<Chat />)).toThrow();
+  });
+});
+```
+
+## 9. Performance Tests
+
+### 9.1 Load Time Tests
+```typescript
+describe('Component Load Times', () => {
+  it('loads chat components within threshold', async () => {
+    const start = performance.now();
+    await import('@/components/chat');
+    const end = performance.now();
+    
+    expect(end - start).toBeLessThan(1000); // 1 second threshold
+  });
+});
+```
+
+## 10. Success Criteria
+
+### Functionality
+- All components render without errors
+- API routes work as expected
+- Authentication flow is maintained
+- Chat functionality is preserved
+
+### Integration
+- Components work with Fuse layout
+- Navigation is functional
+- State management is preserved
+- Styling is consistent
+
+### Performance
+- Load times within acceptable range
+- No memory leaks
+- Smooth animations and transitions 

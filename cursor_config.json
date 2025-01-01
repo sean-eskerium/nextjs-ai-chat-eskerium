@@ -18,7 +18,8 @@
           "Review edge function contracts and response formats",
           "Check state management implications",
           "Verify type definitions and interfaces",
-          "Analyze potential side effects"
+          "Analyze potential side effects",
+          "Review and update affected tests"
         ]
       },
       "sequential_task_flow": true,
@@ -31,7 +32,8 @@
           "project_requirements_document.md",
           "tech_stack_document.md",
           "frontend_architecture_document.md",
-          "file_structure_document.md"
+          "file_structure_document.md",
+          "unit-testing.md"
         ]
       }
     },
@@ -57,11 +59,31 @@
       "testing": {
         "require_verification": true,
         "prevent_untested_changes": true,
+        "test_driven_development": {
+          "required": true,
+          "workflow": [
+            "Write tests first based on requirements",
+            "Run tests (expect failure)",
+            "Implement the feature",
+            "Run tests (expect success)",
+            "Refactor while maintaining passing tests"
+          ],
+          "coverage_requirements": {
+            "new_code": "90%",
+            "modified_code": "maintain or improve existing coverage"
+          }
+        },
         "unit_tests": {
           "framework": "jest",
           "coverage": true,
           "mocked_dependencies": true,
-          "instructions": "Use Jest for testing agents, ensuring mocks are used for external integrations like Supabase and Pinecone."
+          "instructions": "Use Jest for testing agents, ensuring mocks are used for external integrations like Supabase and Pinecone.",
+          "update_requirements": [
+            "Update tests before modifying code",
+            "Add tests for new functionality",
+            "Modify tests to reflect changed requirements",
+            "Never delete tests without thorough analysis"
+          ]
         }
       },
       "architecture": {
@@ -77,7 +99,8 @@
             "Document data flow through the system",
             "Identify potential side effects",
             "Verify type safety across boundaries",
-            "Check edge function contracts"
+            "Check edge function contracts",
+            "Review and update affected tests"
           ],
           "verification_required": true
         }
@@ -89,18 +112,21 @@
         ".env",
         ".env.local",
         "supabase/config.toml",
-        "package.json"
+        "package.json",
+        "__tests__/config/setup.ts"
       ],
       "protected_directories": [
         "supabase",
-        "src"
+        "src",
+        "__tests__"
       ],
       "analysis_required_paths": [
         "src/agents",
         "src/components",
         "supabase/functions",
         "src/types",
-        "src/services"
+        "src/services",
+        "__tests__"
       ]
     },
     "error_handling": {
@@ -111,9 +137,11 @@
       {
         "task": "Set up a new agent module",
         "commands": [
-          "Create a new folder in the `src/agents` directory.",
-          "Define the input/output contract in `index.ts`.",
-          "Write unit tests in `__tests__` using Jest."
+          "Create test file in `__tests__/agents` directory",
+          "Write tests based on requirements",
+          "Create a new folder in the `src/agents` directory",
+          "Define the input/output contract in `index.ts`",
+          "Implement until tests pass"
         ],
         "validation": "Ensure all new modules pass Jest tests with 90%+ coverage before integration."
       },
@@ -128,11 +156,24 @@
         "task": "Modify component behavior",
         "analysis_required": true,
         "steps": [
+          "Review and update affected tests first",
           "Map component relationships and data flow",
           "Review edge function contracts",
           "Check state management implications",
           "Verify type safety",
-          "Document changes in analysis"
+          "Document changes in analysis",
+          "Implement changes while maintaining passing tests"
+        ]
+      },
+      {
+        "task": "Create new API route",
+        "steps": [
+          "Create test file in `__tests__/app/api`",
+          "Write tests for success and error cases",
+          "Mock required dependencies",
+          "Create route file",
+          "Implement route handler",
+          "Verify tests pass with good coverage"
         ]
       }
     ]
