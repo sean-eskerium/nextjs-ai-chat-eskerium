@@ -27,17 +27,10 @@ jest.mock('../../components/ui/sidebar', () => ({
   useSidebar: () => ({ open: false }),
 }));
 
-// Mock the chat component to avoid window size hook
-jest.mock('../../components/chat', () => {
-  const OriginalChat = jest.requireActual('../../components/chat').Chat;
-  return {
-    Chat: (props: any) => {
-      // Mock window size hook
-      (window as any).innerWidth = 1024;
-      (window as any).innerHeight = 768;
-      return <OriginalChat {...props} />;
-    }
-  };
+// Set up window mock before tests
+beforeAll(() => {
+  Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true });
+  Object.defineProperty(window, 'innerHeight', { value: 768, writable: true });
 });
 
 describe('Chat Component', () => {
