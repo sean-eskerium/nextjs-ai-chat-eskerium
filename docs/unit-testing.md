@@ -1,12 +1,13 @@
 # Unit Testing Guide
 
-## Part 1: How to Write Perfect Tests First Time
+## Part 1: Essential Testing Requirements
+> Focus on these sections when writing your first tests for a component
 
 ### Core Principle
 The secret to writing perfect tests is to focus on user-visible behavior and accessibility first, implementation details last.
 
 ### Pro Tip
-Analyze the __tests___ folder as those are working tests. 
+Analyze the `__tests__` folder as those are working tests. See `unit-testing-examples.md` for concrete examples.
 
 ### Success-Driven Analysis Process
 
@@ -33,54 +34,7 @@ Before writing ANY test code:
   - Dialog/modal layers
 - Document the minimal steps to verify it works
 
-Example Analysis:
-```typescript
-// Component: SidebarHistory
-// Component Hierarchy:
-// ├── SidebarMenuItem (for each chat)
-// │   ├── DropdownMenu
-// │   │   ├── DropdownMenuTrigger ("More" button)
-// │   │   └── DropdownMenuContent
-// │   │       └── DropdownMenuItem ("Delete" option)
-// │   └── Dialog
-// │       ├── DialogTrigger
-// │       └── DialogContent
-// │           ├── DialogHeader
-// │           └── DialogFooter
-
-// User-Visible Elements:
-// - List of chat items with titles
-// - "More" button for each chat (aria-label="More")
-// - Dropdown menu with "Delete" and "Share" options
-// - Confirmation dialog for deletion
-// - Loading skeletons during data fetch
-// - Empty state message when no chats
-
-// Multi-Step Processes:
-// 1. Deletion Flow:
-//    - Click "More" button
-//    - Click "Delete" in dropdown
-//    - Confirm in dialog
-//    - See success toast
-//    - Chat disappears from list
-// 2. Share Flow:
-//    - Click "More" button
-//    - Click "Share"
-//    - Select visibility
-//    - See visibility update
-
-// What Changes:
-// - Chat list updates after deletion
-// - Visibility icon changes
-// - Loading states show/hide
-// - Dialogs open/close
-// - Toast notifications appear
-
-// What Stays Same:
-// - Button positions
-// - Icon presence
-// - Accessibility labels
-```
+For examples of DOM structure analysis and state mapping, see `unit-testing-examples.md`.
 
 #### 2. Dependencies Analysis
 ONLY list dependencies that affect user-visible behavior:
@@ -89,106 +43,96 @@ ONLY list dependencies that affect user-visible behavior:
   - Tooltips that users see
   - Click handlers that change visible state
   - Icons that users see
+  - Animation components (e.g., framer-motion)
+  - Window/document methods used in handlers
 - ❌ DON'T Mock:
   - Styling utilities (like cn, cx)
   - Internal state management
   - Class merging logic
   - Style-only components
 
-Example:
-```typescript
-// DO Mock (affects what user sees):
-jest.mock('@/components/ui/tooltip', () => ({
-  TooltipContent: ({ children }) => (
-    <div role="tooltip">{children}</div>
-  )
-}));
+For examples of mocking strategies, see `unit-testing-examples.md`.
 
-// DON'T Mock (implementation detail):
-jest.mock('@/lib/utils', () => ({
-  cn: (...inputs) => inputs.join(' ')
-}));
+#### 3. Basic Test Writing Process
+
+CRITICAL: Element Selection Strategy
+1. NEVER modify production code to add test-specific attributes
+2. Instead, use the existing DOM structure:
+   - Role-based queries for interactive elements: `screen.getByRole('button', { name: /restore this version/i })`
+   - Text content for non-interactive elements: `screen.getByText('You are viewing a previous version')`
+   - DOM relationships: `getByText('Restore this version').nextElementSibling`
+   - CSS class combinations: `container.querySelector('div.flex.flex-col.gap-4.rounded-2xl')`
+3. Order of preference:
+   a. Role-based queries with accessible names
+   b. Text content that users see
+   c. DOM relationships (parent/sibling/child)
+   d. Specific combinations of CSS classes
+   e. data-testid as ABSOLUTE LAST RESORT
+
+Example - Finding elements without modifying production code:
+```typescript
+// ❌ DON'T modify production code to add test hooks
+// weather.tsx
+<div data-testid="weather-container" className="flex flex-col">
+
+// ✅ DO use existing structure
+// weather.test.tsx
+const container = screen.getByText('30°C').closest('div.flex.flex-col');
+// OR
+const container = container.querySelector('div.flex.flex-col.gap-4.rounded-2xl');
+
+// ❌ DON'T modify production code for loading states
+// version-footer.tsx
+<div data-testid="loading-spinner" className="animate-spin">
+
+// ✅ DO use DOM relationships
+// version-footer.test.tsx
+const loadingContainer = screen.getByText('Restore this version').nextElementSibling;
+expect(loadingContainer).toHaveClass('animate-spin');
 ```
 
-#### 3. Test Writing Process
-1. Start with Accessibility
-```typescript
-it('renders with correct accessibility', () => {
-  render(<Component />);
-  
-  // Find by ARIA role and label (what screen readers see)
-  const button = screen.getByRole('button', { 
-    name: 'Exact Label from Browser' 
-  });
-  expect(button).toBeInTheDocument();
-});
-```
+Common Patterns from Our Codebase:
+1. Finding containers:
+   ```typescript
+   // Use class combinations
+   const container = container.querySelector('div.flex.flex-col.gap-4');
+   
+   // Use text content and traverse up
+   const container = screen.getByText('Some Text').closest('div.container');
+   ```
 
-2. Add Visible Content
-```typescript
-it('shows correct visible content', () => {
-  render(<Component />);
-  
-  // Check what users actually see
-  expect(screen.getByText('Exact Text from Browser')).toBeInTheDocument();
-  expect(screen.getByRole('tooltip')).toHaveTextContent('Exact Tooltip Text');
-});
-```
+2. Finding interactive elements:
+   ```typescript
+   // Use role + name
+   const button = screen.getByRole('button', { name: /restore this version/i });
+   
+   // Use role + accessible text
+   const input = screen.getByRole('textbox', { name: /message/i });
+   ```
 
-3. Test Multi-Step Processes
-```typescript
-it('handles complete deletion flow', async () => {
-  const user = userEvent.setup();
-  render(<Component />);
-  
-  // 1. Initial state verification
-  expect(screen.queryByTestId('dialog')).not.toBeInTheDocument();
-  
-  // 2. Open dropdown
-  await user.click(screen.getByTestId('dropdown-trigger'));
-  expect(screen.getByTestId('dropdown-content')).toBeInTheDocument();
-  
-  // 3. Click delete
-  await user.click(screen.getByText('Delete'));
-  expect(screen.getByTestId('dialog')).toBeInTheDocument();
-  
-  // 4. Confirm deletion
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
-  
-  // 5. Verify all side effects
-  expect(fetch).toHaveBeenCalledWith(
-    expect.stringContaining('/api/chat'),
-    expect.objectContaining({ method: 'DELETE' })
-  );
-  expect(mutate).toHaveBeenCalled();
-  expect(toast.success).toHaveBeenCalled();
-  expect(screen.queryByText('Test Chat')).not.toBeInTheDocument();
-});
-```
+3. Finding related elements:
+   ```typescript
+   // Use DOM relationships
+   const label = screen.getByText('Username');
+   const input = label.nextElementSibling;
+   
+   // Use parent-child relationships
+   const container = screen.getByRole('region');
+   const items = container.querySelectorAll('.item');
+   ```
 
-4. Test State Transitions
-```typescript
-it('handles state transitions correctly', async () => {
-  const user = userEvent.setup();
-  render(<Component />);
+Remember:
+- The DOM structure is part of your component's contract
+- Class names used for styling are more stable than test-specific attributes
+- Role-based queries align with how users (including screen readers) interact with your app
+- Text content is a reliable way to find elements as it's what users see
+- DOM relationships (parent/child/sibling) are often more stable than adding test attributes
 
-  // 1. Initial state
-  expect(screen.getByTestId('initial-state')).toBeInTheDocument();
-
-  // 2. Loading state
-  await user.click(screen.getByRole('button'));
-  expect(screen.getByTestId('loading-state')).toBeInTheDocument();
-
-  // 3. Success state
-  await waitFor(() => {
-    expect(screen.getByTestId('success-state')).toBeInTheDocument();
-  });
-
-  // 4. Final state verification
-  expect(screen.queryByTestId('loading-state')).not.toBeInTheDocument();
-  expect(screen.getByTestId('success-state')).toBeInTheDocument();
-});
-```
+### Essential Test Organization
+1. Place mocks at the top of the file
+2. Group related mocks together
+3. Document mock requirements
+4. Keep mocks minimal
 
 ### Common Mistakes to Avoid
 ❌ DON'T:
@@ -211,7 +155,7 @@ it('handles state transitions correctly', async () => {
 - Use specific selectors for similar elements
 - Handle all confirmation steps
 
-### Perfect Test Checklist
+### Essential Test Checklist
 Before writing any test code, verify:
 1. [ ] You've manually used the component in the app
 2. [ ] You've documented exact visible text and labels
@@ -224,7 +168,150 @@ Before writing any test code, verify:
 9. [ ] You've identified all component dependencies
 10. [ ] You've planned specific selectors for similar elements
 
-## Part 2: Production Code Preservation
+## Part 2: Component Analysis and Test Writing
+> These are critical steps for writing comprehensive tests
+
+### Component Behavior Analysis
+1. Document Expected Behavior
+   - [ ] List all user interactions
+   - [ ] Document expected outcomes
+   - [ ] Note any side effects
+   - [ ] List error conditions
+   - [ ] Document loading states
+
+2. Identify State Changes
+   - [ ] List all state variables
+   - [ ] Document state transitions
+   - [ ] Note loading states
+   - [ ] List error states
+   - [ ] Document side effects
+
+3. Map User Interactions
+   - [ ] List all clickable elements
+   - [ ] Document hover states
+   - [ ] Note keyboard interactions
+   - [ ] List form interactions
+   - [ ] Document drag-and-drop
+
+### Test Writing Process
+1. Start with Accessibility
+   - Focus on what screen readers see
+   - Test ARIA roles and labels
+   - Verify keyboard navigation
+
+2. Add Visible Content
+   - Test what users actually see
+   - Check tooltips and visible text
+   - Verify visual state changes
+
+3. Test Multi-Step Processes
+   - Document complete interaction flows
+   - Test each step in sequence
+   - Verify side effects
+
+4. Test State Transitions
+   - Test initial state
+   - Test loading states
+   - Test success/error states
+   - Test final state
+
+### Common Pitfalls and Solutions
+1. **Async Operations**
+   - ❌ Problem: Tests pass locally but fail in CI
+   - ✅ Solution: Always use proper async/await and waitFor
+
+2. **State Updates**
+   - ❌ Problem: State changes not reflected in tests
+   - ✅ Solution: Use act() for state updates, waitFor for async changes
+
+3. **Event Handling**
+   - ❌ Problem: Events not triggering as expected
+   - ✅ Solution: Use userEvent over fireEvent when possible
+
+4. **Component Mounting**
+   - ❌ Problem: useEffect not running in tests
+   - ✅ Solution: Ensure proper cleanup, use proper async utilities
+
+## Part 3: Framework-Specific Guidelines
+
+### Next.js Testing Guidelines
+1. Router Handling
+   - Mock useRouter consistently
+   - Test navigation events
+   - Verify route changes
+
+2. Image Component
+   - Mock next/image appropriately
+   - Test image loading states
+   - Verify responsive behavior
+
+3. API Routes
+   - Mock API responses
+   - Test error conditions
+   - Verify loading states
+
+### React Query Guidelines
+1. Query Setup
+   - Use QueryClientProvider
+   - Mock query responses
+   - Test loading states
+
+2. Mutation Handling
+   - Test optimistic updates
+   - Verify error handling
+   - Test rollback behavior
+
+### React Testing Best Practices
+1. Component Testing
+   - Test user interactions
+   - Verify state changes
+   - Check side effects
+
+2. Hook Testing
+   - Test state updates
+   - Verify cleanup
+   - Test error conditions
+
+## Part 4: Advanced Testing Considerations
+> After basic tests are working, consider these aspects for comprehensive testing
+
+### State Management Analysis
+- [ ] Document all state variables and their purposes
+- [ ] Map state transitions and side effects
+- [ ] Identify optimistic updates and loading states
+- [ ] Understand error state handling
+- [ ] Review state initialization
+- [ ] Document state dependencies between components
+- [ ] Map async state updates
+- [ ] Identify state persistence requirements
+- [ ] List conditions required for state changes
+- [ ] Document state prerequisites for callbacks
+
+### UI/UX Flow Analysis
+- [ ] Map all possible user interaction paths
+- [ ] Document expected behavior for each interaction
+- [ ] List all visual states and transitions
+- [ ] Identify accessibility requirements
+- [ ] Document keyboard navigation flows
+- [ ] Map focus management requirements
+- [ ] List animation states and triggers
+- [ ] Document responsive behavior
+- [ ] Identify multi-step interactions
+- [ ] Map out complete interaction sequences
+
+### Technical Dependencies
+- [ ] List all external libraries used
+- [ ] Document UI framework-specific features
+- [ ] Note any custom hooks or utilities
+- [ ] Identify performance considerations
+- [ ] List required providers
+- [ ] Document API dependencies
+- [ ] Map WebSocket interactions
+- [ ] Review build dependencies
+- [ ] Understand animation library requirements
+- [ ] Document testing library limitations
+
+## Part 5: Production Code Preservation
 
 ### Critical Principles
 1. Never modify production code to make tests easier
@@ -237,95 +324,29 @@ Before writing any test code, verify:
 When encountering difficulties making tests work with production code:
 
 1. **Understand Before Changing**
-```typescript
-// DON'T: Change production code to make tests easier
-// component.tsx
-function Component() {
-  // Changed just for testing
-  if (process.env.NODE_ENV === 'test') {
-    return <SimplifiedVersion />;
-  }
-  return <ActualVersion />;
-}
-
-// DO: Understand and test the actual implementation
-// component.test.tsx
-it('handles complex behavior', () => {
-  // Set up proper mocks and conditions
-  // Test the actual behavior
-});
-```
+- Study the actual implementation
+- Document the behavior
+- Test the real functionality
 
 2. **Mock Complex Dependencies**
-```typescript
-// DON'T: Simplify production code
-// production.ts
-export const complexBehavior = process.env.NODE_ENV === 'test' 
-  ? simplifiedBehavior 
-  : actualBehavior;
-
-// DO: Mock properly in tests
-// test.ts
-jest.mock('./complex-dependency', () => ({
-  ...jest.requireActual('./complex-dependency'),
-  complexBehavior: jest.fn().mockImplementation(() => {
-    // Simulate actual behavior
-  })
-}));
-```
+- Mock only what's necessary
+- Preserve actual behavior
+- Use proper mocking patterns
 
 3. **Handle Async Properly**
-```typescript
-// DON'T: Make async code sync for testing
-// production.ts
-export const fetchData = process.env.NODE_ENV === 'test'
-  ? () => mockData
-  : async () => await realFetch();
-
-// DO: Test async behavior properly
-// test.ts
-it('handles async operations', async () => {
-  await waitFor(() => {
-    expect(screen.getByText('Loaded')).toBeInTheDocument();
-  });
-});
-```
+- Use proper async utilities
+- Wait for state changes
+- Test actual async behavior
 
 4. **Preserve Event Handling**
-```typescript
-// DON'T: Bypass events for testing
-// production.ts
-export const handleClick = process.env.NODE_ENV === 'test'
-  ? () => simpleHandler()
-  : (e) => complexHandler(e);
-
-// DO: Test actual event handling
-// test.ts
-it('handles events properly', async () => {
-  const user = userEvent.setup();
-  await user.click(button);
-  // Verify the actual behavior
-});
-```
+- Test real event flows
+- Maintain event propagation
+- Verify event outcomes
 
 5. **Maintain UI Library Integration**
-```typescript
-// DON'T: Simplify UI library usage
-// production.ts
-export const Animation = process.env.NODE_ENV === 'test'
-  ? SimpleDiv
-  : FramerMotionComponent;
-
-// DO: Mock UI libraries properly
-// test.ts
-jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...props }) => (
-      <div {...props}>{children}</div>
-    )
-  }
-}));
-```
+- Mock UI libraries properly
+- Preserve component behavior
+- Test actual interactions
 
 ### Common Anti-Patterns to Avoid
 
@@ -349,406 +370,14 @@ jest.mock('framer-motion', () => ({
    - ❌ Adding flags to disable features in tests
    - ✅ Test features as they exist in production
 
-## Part 3: Comprehensive Reference
-
-### Component Architecture Analysis
-
-#### State Management Analysis
-- [ ] Document all state variables and their purposes
-- [ ] Map state transitions and side effects
-- [ ] Identify optimistic updates and loading states
-- [ ] Understand error state handling
-- [ ] Review state initialization
-- [ ] Document state dependencies between components
-- [ ] Map async state updates
-- [ ] Identify state persistence requirements
-- [ ] List conditions required for state changes
-- [ ] Document state prerequisites for callbacks
-
-#### UI/UX Flow Analysis
-- [ ] Map all possible user interaction paths
-- [ ] Document expected behavior for each interaction
-- [ ] List all visual states and transitions
-- [ ] Identify accessibility requirements
-- [ ] Document keyboard navigation flows
-- [ ] Map focus management requirements
-- [ ] List animation states and triggers
-- [ ] Document responsive behavior
-- [ ] Identify multi-step interactions
-- [ ] Map out complete interaction sequences
-
-#### Technical Dependencies
-- [ ] List all external libraries used
-- [ ] Document UI framework-specific features
-- [ ] Note any custom hooks or utilities
-- [ ] Identify performance considerations
-- [ ] List required providers
-- [ ] Document API dependencies
-- [ ] Map WebSocket interactions
-- [ ] Review build dependencies
-- [ ] Understand animation library requirements
-- [ ] Document testing library limitations
-
-### Testing Patterns
-
-#### Multi-Step Interaction Pattern
-Some components require multiple user interactions to complete an action. When testing these:
-
-1. **Map the Complete Interaction Flow**
-```typescript
-// Example: Reading Level Selector
-// 1. User opens the selector
-// 2. User drags to select a level
-// 3. User clicks to confirm selection
-```
-
-2. **Identify State Dependencies**
-- List all conditions that must be met for callbacks to fire
-- Document state variables that affect behavior
-```typescript
-// Example: Reading Level Selection
-// Required conditions:
-// - currentLevel !== selectedLevel
-// - hasUserSelectedLevel === true
-```
-
-3. **Mock Complex Libraries**
-When mocking libraries like framer-motion:
-```typescript
-jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, onDragEnd, onClick, ...props }) => (
-      <div
-        onClick={(e) => {
-          // Simulate any state updates that would happen during drag
-          onDragEnd?.({
-            target: { getBoundingClientRect: () => ({ top: 5 }) }
-          });
-          // Then trigger the click handler
-          onClick?.(e);
-        }}
-        {...props}
-      >
-        {children}
-      </div>
-    )
-  }
-}));
-```
-
-4. **Test Complete Interaction Sequences**
-```typescript
-it('handles complete interaction flow', async () => {
-  const user = userEvent.setup();
-  render(<Component />);
-
-  // 1. Initial interaction
-  await user.click(screen.getByRole('button'));
-
-  // 2. Simulate intermediate state changes
-  fireEvent.dragEnd(screen.getByTestId('selector'));
-
-  // 3. Complete the interaction
-  await user.click(screen.getByTestId('selector'));
-
-  // 4. Verify the complete flow
-  expect(mockCallback).toHaveBeenCalledWith(expectedArgs);
-});
-```
-
-### Component-Specific Testing Patterns
-
-#### Text Display Components
-- Only test the rendered text
-- Don't test styling or classes
-- Don't mock unless absolutely necessary
-```typescript
-// DO: Test rendered content
-it('renders markdown content', () => {
-  render(<MarkdownComponent>**bold**</MarkdownComponent>);
-  expect(screen.getByText('bold')).toBeInTheDocument();
-});
-
-// DON'T: Test implementation details
-// ❌ expect(screen.getByTestId('markdown')).toHaveClass('prose');
-```
-
-#### Interactive Components
-- Test only the primary interaction path first
-- Add edge cases only after primary path works
-- Mock only framework-level UI components
-```typescript
-// DO: Test user interactions
-it('handles click', async () => {
-  const user = userEvent.setup();
-  render(<Button>Click me</Button>);
-  await user.click(screen.getByRole('button'));
-  expect(screen.getByText('Clicked')).toBeInTheDocument();
-});
-
-// DON'T: Call handlers directly
-// ❌ button.props.onClick();
-```
-
-#### Form Components
-- Test visible input/output
-- Don't test validation directly
-- Test submission results, not submission process
-```typescript
-// DO: Test user input
-it('handles input', async () => {
-  const user = userEvent.setup();
-  render(<Input />);
-  await user.type(screen.getByRole('textbox'), 'test');
-  expect(screen.getByRole('textbox')).toHaveValue('test');
-});
-
-// DON'T: Set values directly
-// ❌ input.value = 'test';
-```
-
-### Visual Testing Guidelines
-
-#### Animation States
-```typescript
-it('handles animation states correctly', async () => {
-  const { container } = render(<AnimatedComponent />);
-  
-  // Initial state
-  expect(container.firstChild).toHaveClass('initial-state');
-  
-  // Trigger animation
-  await userEvent.click(screen.getByRole('button'));
-  
-  // Check transition class
-  expect(container.firstChild).toHaveClass('animating');
-  
-  // Wait for animation completion
-  await waitFor(() => {
-    expect(container.firstChild).toHaveClass('final-state');
-  });
-});
-```
-
-#### Layout Testing
-```typescript
-it('handles responsive layout correctly', () => {
-  const { container } = render(<ResponsiveComponent />);
-  
-  // Test mobile layout
-  window.innerWidth = 375;
-  fireEvent(window, new Event('resize'));
-  expect(container.firstChild).toHaveClass('mobile-layout');
-  
-  // Test desktop layout
-  window.innerWidth = 1024;
-  fireEvent(window, new Event('resize'));
-  expect(container.firstChild).toHaveClass('desktop-layout');
-});
-```
-
-### Performance Testing
-
-#### Render Performance
-```typescript
-it('renders efficiently', async () => {
-  const renderCount = jest.fn();
-  
-  function TestComponent() {
-    useEffect(renderCount);
-    return <Component />;
-  }
-  
-  render(<TestComponent />);
-  
-  // Trigger state update
-  await userEvent.click(screen.getByRole('button'));
-  
-  // Should only render twice (initial + update)
-  expect(renderCount).toHaveBeenCalledTimes(2);
-});
-```
-
-#### Memory Management
-```typescript
-it('cleans up resources properly', () => {
-  const cleanup = jest.fn();
-  jest.spyOn(React, 'useEffect').mockImplementation((cb) => {
-    const cleanupFn = cb();
-    if (cleanupFn) cleanup = cleanupFn;
-  });
-  
-  const { unmount } = render(<Component />);
-  unmount();
-  
-  expect(cleanup).toHaveBeenCalled();
-});
-```
-
-### Error Handling Matrix
-
-| Scenario | Expected Behavior | Test Approach | Example |
-|----------|------------------|---------------|---------|
-| Network Error | Show error message | Mock failed request | `mockFetch.mockRejectedValue(new Error())` |
-| Invalid Input | Display validation | Simulate invalid input | `await user.type(input, '!@#')` |
-| Timeout | Show retry option | Mock timeout | `jest.advanceTimersByTime(5000)` |
-| Server Error | Display error state | Mock error response | `res(ctx.status(500))` |
-| Validation Error | Show field errors | Submit invalid form | `expect(screen.getByRole('alert')).toBeInTheDocument()` |
-| Auth Error | Redirect to login | Mock auth failure | `expect(mockRouter.push).toHaveBeenCalledWith('/login')` |
-
-### Framework-Specific Guidelines
-
-#### Next.js Components
-- Always mock `next/link`, `next/router`, `next/image`
-- Don't mock basic Next.js features
-- Test client-side navigation through router mocks
-
-#### React Query / SWR
-- Mock at the query level, not the fetch level
-- Test loading, success, and error states
-- Use proper query client wrappers
-
-#### UI Libraries
-- Framer Motion: Mock at component level
-- Radix UI: Test accessibility features
-- Headless UI: Test state management
-
-### Testing Library Best Practices
-
-#### Queries
-Use queries in this order:
-1. `getByRole` - Best for interactive elements
-2. `getByText` - Best for non-interactive elements
-3. `getByLabelText` - Best for form fields
-4. `getByPlaceholderText` - Acceptable for inputs
-5. `getByTestId` - Last resort
-
-#### Async
-Always use proper async utilities:
-```typescript
-// DO: Use proper async handling
-await waitFor(() => {
-  expect(screen.getByText('Loaded')).toBeInTheDocument();
-});
-
-// DON'T: Use arbitrary timeouts
-// ❌ setTimeout(() => {}, 1000);
-```
-
-### Test Case Design Patterns
-
-#### State Machine Pattern
-```typescript
-const states = {
-  initial: {
-    setup: () => render(<Component />),
-    assertions: () => {
-      expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
-    }
-  },
-  open: {
-    setup: async (user) => {
-      await user.click(screen.getByRole('button'));
-    },
-    assertions: () => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    }
-  },
-  loading: {
-    setup: async (user) => {
-      await user.click(screen.getByRole('button', { name: 'Submit' }));
-    },
-    assertions: () => {
-      expect(screen.getByRole('status')).toHaveTextContent('Loading...');
-    }
-  },
-  error: {
-    setup: async (user) => {
-      server.use(
-        rest.post('/api/submit', (req, res, ctx) => {
-          return res(ctx.status(500));
-        })
-      );
-      await user.click(screen.getByRole('button', { name: 'Submit' }));
-    },
-    assertions: () => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Error occurred');
-    }
-  }
-};
-
-describe('Component States', () => {
-  Object.entries(states).forEach(([stateName, state]) => {
-    it(`behaves correctly in ${stateName} state`, async () => {
-      const user = userEvent.setup();
-      await state.setup(user);
-      await state.assertions();
-    });
-  });
-});
-```
-
-#### Interaction Flow Pattern
-```typescript
-const flows = {
-  simpleClick: {
-    description: 'Single click interaction',
-    steps: [
-      {
-        action: async (user) => {
-          await user.click(screen.getByRole('button'));
-        },
-        assert: () => {
-          expect(screen.getByRole('dialog')).toBeInTheDocument();
-        }
-      }
-    ]
-  },
-  dragAndClick: {
-    description: 'Drag followed by click confirmation',
-    steps: [
-      {
-        action: (element) => {
-          fireEvent.dragEnd(element, {
-            target: { getBoundingClientRect: () => ({ top: 100 }) }
-          });
-        },
-        assert: () => {
-          expect(screen.getByTestId('value-display')).toHaveTextContent('100');
-        }
-      },
-      {
-        action: async (user) => {
-          await user.click(screen.getByTestId('confirm'));
-        },
-        assert: () => {
-          expect(mockCallback).toHaveBeenCalledWith(100);
-        }
-      }
-    ]
-  }
-};
-
-describe('Component Flows', () => {
-  Object.entries(flows).forEach(([flowName, flow]) => {
-    it(`handles ${flow.description}`, async () => {
-      const user = userEvent.setup();
-      const element = render(<Component />);
-      
-      for (const step of flow.steps) {
-        await step.action(user, element);
-        await step.assert();
-      }
-    });
-  });
-});
-```
-
-### Test Maintenance
+## Part 6: Organization and Code Review
 
 #### Code Review Checklist
 - [ ] Tests follow naming conventions
 - [ ] Mocks are properly typed
+- [ ] Tests focus on user-visible behavior
+- [ ] Proper async handling is used
+- [ ] Mocks are minimal and necessary
 - [ ] Error cases are covered
 - [ ] Performance implications considered
 - [ ] Accessibility tests included
@@ -756,501 +385,69 @@ describe('Component Flows', () => {
 - [ ] Proper cleanup implemented
 - [ ] Documentation updated
 
-#### Test Refactoring Patterns
-```typescript
-// Extract common setup
-const setup = (props = {}) => {
-  const user = userEvent.setup();
-  const utils = render(<Component {...defaultProps} {...props} />);
-  return {
-    user,
-    ...utils,
-  };
-};
-
-// Create test utilities
-const fillForm = async (user: UserEvent, data: FormData) => {
-  for (const [field, value] of Object.entries(data)) {
-    await user.type(screen.getByLabelText(field), value);
-  }
-};
-
-// Implement test factories
-const createMockUser = (overrides = {}) => ({
-  id: 1,
-  name: 'Test User',
-  email: 'test@example.com',
-  ...overrides,
-});
-```
-
-### Testing Metrics
-
-#### Coverage Goals
-- Line Coverage: >90%
-- Branch Coverage: >85%
-- Function Coverage: >90%
-- Statement Coverage: >90%
-
-#### Quality Metrics
-- Test Reliability: <1% flaky tests
-- Test Performance: <5s per test
-- Maintenance Ratio: <1:3 test:code
-- Coverage Trend: Increasing or stable
-
-Remember:
-- Start with what works and build from there
-- Test what users can see and do
-- Mock only what's necessary
-- Keep tests simple and focused
-- Follow the complete interaction flow
-- Use proper async patterns
-- Focus on component output 
-
-### Component Behavior Analysis
-Before writing any tests, analyze how the component actually behaves:
-
-1. **Button and Control Analysis**
-- Identify the actual accessible names of buttons (what screen readers would announce)
-- Note any icon-only buttons and their accessible labels
-- Document any conditional button states (e.g., enabled/disabled, visible/hidden)
-- Map out button locations within the component hierarchy
-
-2. **State Transitions**
-- Document the complete state machine of the component
-- Note what triggers each state change
-- Identify loading states and their triggers
-- Map error states and their conditions
-
-Example Analysis:
-```typescript
-// Component: MultimodalInput
-// Buttons:
-// - Send: Only visible when there's input, icon-only button with aria-label="Send message"
-// - Stop: Only visible during message generation, icon-only button with aria-label="Stop generating"
-// - Attach: Always visible, icon-only button with aria-label="Attach file"
-
-// States:
-// - Initial: Empty input, only Attach button visible
-// - HasInput: Input has text, Send button becomes visible
-// - Generating: Loading state, Stop button replaces Send button
-// - Error: Error message shown, returns to HasInput or Initial state
-```
-
-3. **Accessibility Structure**
-- Use browser dev tools to inspect the actual ARIA roles and labels
-- Note the hierarchy of interactive elements
-- Document any dynamic ARIA attributes
-
-#### Test Writing Process
-
-1. **Start With Element Queries**
-```typescript
-// DON'T: Make assumptions about button names
-const sendButton = screen.getByRole('button', { name: 'send' });
-
-// DO: Check actual accessible names in the browser first
-const sendButton = screen.getByRole('button', { name: 'Send message' });
-```
-
-2. **Handle Conditional Elements**
-```typescript
-// DON'T: Assume elements are immediately available
-expect(screen.getByRole('button', { name: 'Stop generating' })).toBeInTheDocument();
-
-// DO: Account for state transitions
-await waitFor(() => {
-  expect(screen.getByRole('button', { name: 'Stop generating' })).toBeInTheDocument();
-});
-```
-
-3. **Test Complete Interaction Flows**
-```typescript
-it('handles message generation flow', async () => {
-  const user = userEvent.setup();
-  render(<MultimodalInput />);
-
-  // 1. Initial state
-  expect(screen.queryByRole('button', { name: 'Send message' })).not.toBeInTheDocument();
-  
-  // 2. Enter text
-  await user.type(screen.getByRole('textbox'), 'test message');
-  expect(screen.getByRole('button', { name: 'Send message' })).toBeInTheDocument();
-  
-  // 3. Send message
-  await user.click(screen.getByRole('button', { name: 'Send message' }));
-  
-  // 4. Verify loading state
-  await waitFor(() => {
-    expect(screen.getByRole('button', { name: 'Stop generating' })).toBeInTheDocument();
-  });
-});
-```
-
 ### Common Pitfalls and Solutions
 
-#### Element Querying
-- ❌ Don't assume button names without checking the actual DOM
-- ❌ Don't use implementation-specific selectors
-- ✅ Always verify actual accessible names in the browser
-- ✅ Use role-based queries with correct names
+#### Test Organization Pitfalls
+1. **Unclear Test Structure**
+   - ❌ Problem: Tests are hard to follow and maintain
+   - ✅ Solution: Use describe blocks to group related tests
 
-#### State Management
-- ❌ Don't test implementation details of state
-- ❌ Don't assume immediate state changes
-- ✅ Test visible results of state changes
-- ✅ Use proper async utilities for state transitions
+2. **Poor Naming**
+   - ❌ Problem: Test names don't describe what's being tested
+   - ✅ Solution: Use descriptive names that explain the scenario and expected outcome
 
-#### Component Contract
-- ❌ Don't modify production code to make tests easier
-- ❌ Don't add test-specific attributes
-- ✅ Test the component as users would interact with it
-- ✅ Use existing accessibility attributes for queries
+3. **Missing Edge Cases**
+   - ❌ Problem: Only happy path is tested
+   - ✅ Solution: Include error states, boundary conditions, and edge cases
 
-### Testing Controlled Components
+#### Technical Pitfalls
+1. **Async Operations**
+   - ❌ Problem: Tests pass locally but fail in CI
+   - ✅ Solution: Always use proper async/await and waitFor
 
-When testing components that manage state through props and callbacks:
+2. **State Updates**
+   - ❌ Problem: State changes not reflected in tests
+   - ✅ Solution: Use act() for state updates, waitFor for async changes
 
-1. **Understand the Component Contract**
-```typescript
-// Component contract example:
-interface ControlledInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-  isLoading?: boolean;
-}
-```
+3. **Event Handling**
+   - ❌ Problem: Events not triggering as expected
+   - ✅ Solution: Use userEvent over fireEvent when possible
 
-2. **Test State Updates**
-```typescript
-it('calls onChange with new value', async () => {
-  const handleChange = jest.fn();
-  const user = userEvent.setup();
-  
-  render(
-    <ControlledInput
-      value=""
-      onChange={handleChange}
-      onSubmit={jest.fn()}
-    />
-  );
-  
-  // Type into the input
-  await user.type(screen.getByRole('textbox'), 'test');
-  
-  // Verify each change is called
-  expect(handleChange).toHaveBeenCalledTimes(4);
-  expect(handleChange).toHaveBeenLastCalledWith('test');
-});
-```
+4. **Component Mounting**
+   - ❌ Problem: useEffect not running in tests
+   - ✅ Solution: Ensure proper cleanup, use proper async utilities
 
-3. **Test Loading States**
-```typescript
-it('disables input during loading', () => {
-  render(
-    <ControlledInput
-      value=""
-      onChange={jest.fn()}
-      onSubmit={jest.fn()}
-      isLoading={true}
-    />
-  );
-  
-  // Verify input is disabled
-  expect(screen.getByRole('textbox')).toBeDisabled();
-  
-  // Verify submit button is disabled
-  expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
-});
-```
+5. **Mock Management**
+   - ❌ Problem: Mocks interfering between tests
+   - ✅ Solution: Clear all mocks in afterEach
 
-4. **Test Conditional Rendering**
-```typescript
-it('shows appropriate button based on loading state', () => {
-  const { rerender } = render(
-    <ControlledInput
-      value="test"
-      onChange={jest.fn()}
-      onSubmit={jest.fn()}
-      isLoading={false}
-    />
-  );
-  
-  // Initially shows submit button
-  expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument();
-  
-  // Update to loading state
-  rerender(
-    <ControlledInput
-      value="test"
-      onChange={jest.fn()}
-      onSubmit={jest.fn()}
-      isLoading={true}
-    />
-  );
-  
-  // Now shows loading indicator
-  expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
-});
-```
+### Organization Guidelines
 
-5. **Test Complete Interaction Flows**
-```typescript
-it('handles submit flow correctly', async () => {
-  const handleSubmit = jest.fn();
-  const user = userEvent.setup();
-  
-  const { rerender } = render(
-    <ControlledInput
-      value=""
-      onChange={jest.fn()}
-      onSubmit={handleSubmit}
-      isLoading={false}
-    />
-  );
-  
-  // Initially submit button should be disabled
-  expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
-  
-  // Rerender with value
-  rerender(
-    <ControlledInput
-      value="test"
-      onChange={jest.fn()}
-      onSubmit={handleSubmit}
-      isLoading={false}
-    />
-  );
-  
-  // Now submit button should be enabled
-  const submitButton = screen.getByRole('button', { name: 'Submit' });
-  expect(submitButton).toBeEnabled();
-  
-  // Click submit
-  await user.click(submitButton);
-  
-  // Verify submit was called
-  expect(handleSubmit).toHaveBeenCalledTimes(1);
-});
-```
+#### Test Structure
+1. Group related tests together
+2. Order tests by complexity
+3. Start with basic rendering
+4. Move to interaction tests
+5. End with complex flows
 
-Common Pitfalls:
-- ❌ Don't test internal state, test props and callbacks
-- ❌ Don't assume immediate state updates
-- ❌ Don't test implementation details of state management
-- ✅ Test the component's public API
-- ✅ Test visible changes based on prop updates
-- ✅ Test callback behavior with user interactions
+#### Test Naming
+1. Use descriptive names
+2. Include the scenario being tested
+3. Describe expected behavior
+4. Group related tests under describe blocks
 
-### Component Mocking Best Practices
+#### Mock Organization
+1. Place mocks at the top of the file
+2. Group related mocks together
+3. Document mock requirements
+4. Keep mocks minimal
 
-#### 1. Mock Pattern Analysis
-Before writing ANY mocks:
-- Find similar component tests in the codebase
-- Note how they mock complex UI libraries
-- Document the established patterns
-- Use consistent mock patterns across tests
-
-Example Analysis:
-```typescript
-// DON'T: Make assumptions about internal behavior
-jest.mock('@/components/ui/dropdown-menu', () => ({
-  DropdownMenuItem: () => (
-    <div role="menuitem" data-highlighted={isHighlighted}>
-      {children}
-    </div>
-  )
-}));
-
-// DO: Follow established patterns with data-testid
-jest.mock('@/components/ui/dropdown-menu', () => ({
-  DropdownMenuItem: ({ children, onSelect }) => (
-    <div 
-      data-testid="dropdown-item"
-      role="menuitem" 
-      onClick={onSelect}
-    >
-      {children}
-    </div>
-  )
-}));
-```
-
-#### 2. UI Library Mocking Guidelines
-- ✅ DO Mock:
-  - Component structure (parent-child relationships)
-  - Event handlers (click, keydown)
-  - Accessibility attributes (role, aria-*)
-  - Data test IDs for querying
-- ❌ DON'T Mock:
-  - Internal state management
-  - Focus/highlight behavior
-  - Animation states
-  - Complex UI library features
-
-Example:
-```typescript
-// DON'T: Try to replicate internal behavior
-jest.mock('@/components/ui/menu', () => ({
-  Menu: () => {
-    const [isOpen, setIsOpen] = useState(false);
-    return <div>{isOpen && children}</div>;
-  }
-}));
-
-// DO: Keep mocks simple and focused on structure
-jest.mock('@/components/ui/menu', () => ({
-  Menu: ({ children }) => (
-    <div data-testid="menu">{children}</div>
-  )
-}));
-```
-
-#### 3. Component Query Strategy
-Order of preference for queries:
-1. `data-testid` for structural components
-2. ARIA roles for interactive elements
-3. Text content for user-visible elements
-4. Alt text for images
-5. Other attributes as last resort
-
-Example:
-```typescript
-// DON'T: Mix query strategies
-const menu = screen.getByTestId('menu');
-const button = within(menu).getByText('Click me');
-
-// DO: Use consistent query strategy
-const menu = screen.getByTestId('menu');
-const button = within(menu).getByRole('button', { name: 'Click me' });
-```
-
-### Test Setup Patterns
-
-#### 1. Use Setup Functions
-ALWAYS create a setup function that:
-- Handles common render logic
-- Provides user-event instance
-- Allows prop overrides
-- Returns useful utilities
-
-Example:
-```typescript
-const setup = (props = {}) => {
-  const user = userEvent.setup();
-  const utils = render(
-    <Provider>
-      <Component {...defaultProps} {...props} />
-    </Provider>
-  );
-  return {
-    user,
-    ...utils,
-  };
-};
-```
-
-#### 2. Mock Reset Strategy
-- Reset ALL mocks in beforeEach
-- Set up default mock returns
-- Document mock requirements
-
-Example:
-```typescript
-describe('Component', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (useSomeHook as jest.Mock).mockReturnValue({
-      data: defaultData,
-      action: jest.fn(),
-    });
-  });
-});
-```
-
-### Testing Complex Interactions
-
-#### 1. User Action Testing
-Focus on user-visible results:
-- ✅ Test what changed visually
-- ✅ Test what callbacks were called
-- ✅ Test accessibility states
-- ❌ Don't test internal state
-- ❌ Don't test implementation details
-
-Example:
-```typescript
-// DON'T: Test implementation
-expect(component.state.isOpen).toBe(true);
-
-// DO: Test user-visible results
-expect(screen.getByRole('menu')).toBeInTheDocument();
-expect(mockCallback).toHaveBeenCalled();
-```
-
-#### 2. Keyboard Navigation
-Focus on achievable results:
-- ✅ Test tab navigation
-- ✅ Test Enter/Space activation
-- ✅ Test Escape closing
-- ✅ Test presence of elements
-- ❌ Don't test focus management
-- ❌ Don't test highlight states
-
-Example:
-```typescript
-// DON'T: Test internal focus management
-expect(menuItem).toHaveFocus();
-
-// DO: Test visible results
-await user.tab();
-await user.keyboard('{Enter}');
-expect(screen.getByRole('menu')).toBeInTheDocument();
-```
-
-### Common Pitfalls to Avoid
-
-1. **Over-testing Library Features**
-   - ❌ Testing Radix UI's focus management
-   - ❌ Testing React Hook Form validation
-   - ✅ Test your integration with these libraries
-
-2. **Inconsistent Query Strategies**
-   - ❌ Mixing getByRole and getByTestId randomly
-   - ✅ Follow the established query hierarchy
-
-3. **Complex Mock Implementation**
-   - ❌ Trying to replicate library behavior
-   - ✅ Mock only what's needed for your test
-
-4. **Testing Implementation Details**
-   - ❌ Testing component state
-   - ❌ Testing private methods
-   - ✅ Test user-visible behavior
-
-### Perfect Test Checklist
-
-Before writing code:
-1. [ ] Find and analyze similar component tests
-2. [ ] Document the established mock patterns
-3. [ ] List all required providers
-4. [ ] Plan query strategy
-5. [ ] Identify user-visible behaviors
-6. [ ] Note required keyboard interactions
-
-During implementation:
-1. [ ] Create setup function first
-2. [ ] Follow established mock patterns
-3. [ ] Use consistent query strategy
-4. [ ] Focus on user-visible behavior
-5. [ ] Test actual outcomes, not implementation
-
-After implementation:
-1. [ ] Verify mock consistency
-2. [ ] Check query strategy consistency
-3. [ ] Ensure no implementation details are tested
-4. [ ] Verify provider setup
-5. [ ] Compare with similar tests
-
-// ... rest of existing content ... 
+## References
+- See `unit-testing-examples.md` for:
+  - DOM structure examples
+  - Mock examples
+  - Test pattern examples
+  - Class testing examples
+  - Real-world component examples
+- Check `__tests__` folder for working examples
+- Review Jest and Testing Library documentation for best practices 
