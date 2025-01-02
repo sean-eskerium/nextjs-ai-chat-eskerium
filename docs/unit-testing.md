@@ -4,9 +4,10 @@
 Our goal is to write tests that work correctly on the first attempt by:
 1. Thoroughly understanding the component's implementation before writing any tests
 2. Being familiar with testing library syntax and patterns
-3. Understanding UI library (e.g., Radix UI) testing requirements
+3. Understanding UI library (e.g., Radix UI, Framer Motion) testing requirements
 4. Following a systematic approach to test writing
 5. Ensuring tests are maintainable and reflect real user behavior
+6. Identifying and testing complete interaction flows, not just individual events
 
 ## Pre-Testing Analysis Checklist
 
@@ -16,9 +17,11 @@ Our goal is to write tests that work correctly on the first attempt by:
 - [ ] Map data flow (props, state, context)
 - [ ] Identify integration points with other components
 - [ ] Review component's TypeScript interfaces/types
-- [ ] Understand component's lifecycle
+- [ ] Understand component's lifecycle and state transitions
 - [ ] Document component's responsibilities
 - [ ] Identify potential refactoring needs
+- [ ] Map out all event handlers and their dependencies
+- [ ] Review any UI library-specific features (Framer Motion, Radix UI, etc.)
 
 ### State Management Analysis
 - [ ] Document all state variables and their purposes
@@ -26,9 +29,11 @@ Our goal is to write tests that work correctly on the first attempt by:
 - [ ] Identify optimistic updates and loading states
 - [ ] Understand error state handling
 - [ ] Review state initialization
-- [ ] Document state dependencies
+- [ ] Document state dependencies between components
 - [ ] Map async state updates
 - [ ] Identify state persistence requirements
+- [ ] List conditions required for state changes
+- [ ] Document state prerequisites for callbacks
 
 ### UI/UX Flow Analysis
 - [ ] Map all possible user interaction paths
@@ -39,6 +44,8 @@ Our goal is to write tests that work correctly on the first attempt by:
 - [ ] Map focus management requirements
 - [ ] List animation states and triggers
 - [ ] Document responsive behavior
+- [ ] Identify multi-step interactions
+- [ ] Map out complete interaction sequences
 
 ### Technical Dependencies
 - [ ] List all external libraries used
@@ -49,6 +56,8 @@ Our goal is to write tests that work correctly on the first attempt by:
 - [ ] Document API dependencies
 - [ ] Map WebSocket interactions
 - [ ] Review build dependencies
+- [ ] Understand animation library requirements
+- [ ] Document testing library limitations
 
 ## Best Practices
 
@@ -61,6 +70,8 @@ Our goal is to write tests that work correctly on the first attempt by:
 - Understand component hierarchy and parent-child relationships
 - Review event handlers and their side effects
 - Map out component's data flow and state changes
+- Document all conditions that must be met for callbacks
+- Understand the complete interaction flow
 
 ### 2. Test Setup
 - Mock hooks properly using jest.mock with requireActual for partial mocks
@@ -71,6 +82,8 @@ Our goal is to write tests that work correctly on the first attempt by:
 - Ensure proper test isolation
 - Mock complex UI libraries (e.g., framer-motion) appropriately
 - Handle asynchronous operations correctly
+- Set up all required state conditions
+- Mock complete interaction flows
 
 ### 3. Test Organization
 - Group related test cases logically
@@ -81,6 +94,92 @@ Our goal is to write tests that work correctly on the first attempt by:
 - Ensure proper cleanup between tests
 - Test error states and edge cases
 - Verify component integration points
+- Test complete interaction sequences
+- Verify intermediate states during complex interactions
+
+## Testing Complex Interactions
+
+### Multi-Step Interaction Pattern
+Some components require multiple user interactions to complete an action. When testing these:
+
+1. **Map the Complete Interaction Flow**
+   ```typescript
+   // Example: Reading Level Selector
+   // 1. User opens the selector
+   // 2. User drags to select a level
+   // 3. User clicks to confirm selection
+   ```
+
+2. **Identify State Dependencies**
+   - List all conditions that must be met for callbacks to fire
+   - Document state variables that affect behavior
+   ```typescript
+   // Example: Reading Level Selection
+   // Required conditions:
+   // - currentLevel !== selectedLevel
+   // - hasUserSelectedLevel === true
+   ```
+
+3. **Mock Complex Libraries**
+   When mocking libraries like framer-motion:
+   ```typescript
+   jest.mock('framer-motion', () => ({
+     motion: {
+       div: ({ children, onDragEnd, onClick, ...props }) => (
+         <div
+           onClick={(e) => {
+             // Simulate any state updates that would happen during drag
+             onDragEnd?.({
+               target: { getBoundingClientRect: () => ({ top: 5 }) }
+             });
+             // Then trigger the click handler
+             onClick?.(e);
+           }}
+           {...props}
+         >
+           {children}
+         </div>
+       )
+     },
+     // Mock other necessary exports...
+   }));
+   ```
+
+4. **Test Complete Interaction Sequences**
+   ```typescript
+   it('handles complete interaction flow', async () => {
+     const user = userEvent.setup();
+     render(<Component />);
+
+     // 1. Initial interaction
+     await user.click(screen.getByRole('button'));
+
+     // 2. Simulate intermediate state changes
+     fireEvent.dragEnd(screen.getByTestId('selector'));
+
+     // 3. Complete the interaction
+     await user.click(screen.getByTestId('selector'));
+
+     // 4. Verify the complete flow
+     expect(mockCallback).toHaveBeenCalledWith(expectedArgs);
+   });
+   ```
+
+5. **Common Pitfalls**
+   - Not simulating all required events in the sequence
+   - Missing state prerequisites for callbacks
+   - Incomplete mocking of complex UI libraries
+   - Not verifying intermediate states
+   - Testing individual events instead of complete flows
+
+### Testing Checklist for Complex Interactions
+- [ ] Map out complete user interaction flow
+- [ ] Identify all state dependencies
+- [ ] List required conditions for callbacks
+- [ ] Mock UI libraries to simulate correct behavior
+- [ ] Test complete interaction sequences
+- [ ] Verify intermediate states
+- [ ] Check final callback arguments
 
 ## Testing Templates
 
@@ -113,6 +212,59 @@ describe('RadixComponent', () => {
     // Standard assertions
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+```
+
+### Framer Motion Components
+```typescript
+describe('MotionComponent', () => {
+  // Mock setup
+  beforeAll(() => {
+    jest.mock('framer-motion', () => ({
+      motion: {
+        div: ({ children, onDragEnd, onClick, ...props }) => (
+          <div
+            data-testid="motion-element"
+            onClick={onClick}
+            onDragEnd={onDragEnd}
+            {...props}
+          >
+            {children}
+          </div>
+        )
+      },
+      AnimatePresence: ({ children }) => children,
+      useMotionValue: () => ({
+        set: jest.fn(),
+        get: jest.fn(),
+        onChange: jest.fn()
+      })
+    }));
+  });
+
+  it('handles motion interactions', async () => {
+    const user = userEvent.setup();
+    const mockCallback = jest.fn();
+    
+    render(<MotionComponent onComplete={mockCallback} />);
+    
+    // Test complete interaction sequence
+    const element = screen.getByTestId('motion-element');
+    
+    // Simulate drag
+    fireEvent.dragEnd(element, {
+      target: { getBoundingClientRect: () => ({ top: 100 }) }
+    });
+    
+    // Verify intermediate state
+    expect(element).toHaveStyle({ transform: 'translateY(100px)' });
+    
+    // Complete interaction
+    await user.click(element);
+    
+    // Verify callback
+    expect(mockCallback).toHaveBeenCalledWith(expect.any(Object));
   });
 });
 ```
@@ -238,37 +390,59 @@ describe('Component States', () => {
 });
 ```
 
-### Builder Pattern
+### Interaction Flow Pattern
 ```typescript
-class ComponentBuilder {
-  private props: any = {};
-
-  withInitialData(data: any) {
-    this.props.initialData = data;
-    return this;
+const flows = {
+  simpleClick: {
+    description: 'Single click interaction',
+    steps: [
+      {
+        action: async (user) => {
+          await user.click(screen.getByRole('button'));
+        },
+        assert: () => {
+          expect(screen.getByRole('dialog')).toBeInTheDocument();
+        }
+      }
+    ]
+  },
+  dragAndClick: {
+    description: 'Drag followed by click confirmation',
+    steps: [
+      {
+        action: (element) => {
+          fireEvent.dragEnd(element, {
+            target: { getBoundingClientRect: () => ({ top: 100 }) }
+          });
+        },
+        assert: () => {
+          expect(screen.getByTestId('value-display')).toHaveTextContent('100');
+        }
+      },
+      {
+        action: async (user) => {
+          await user.click(screen.getByTestId('confirm'));
+        },
+        assert: () => {
+          expect(mockCallback).toHaveBeenCalledWith(100);
+        }
+      }
+    ]
   }
+};
 
-  withLoading(loading: boolean) {
-    this.props.loading = loading;
-    return this;
-  }
-
-  withError(error: Error | null) {
-    this.props.error = error;
-    return this;
-  }
-
-  build() {
-    return render(<Component {...this.props} />);
-  }
-}
-
-it('renders in loading state', () => {
-  new ComponentBuilder()
-    .withLoading(true)
-    .build();
-
-  expect(screen.getByRole('status')).toHaveTextContent('Loading...');
+describe('Component Flows', () => {
+  Object.entries(flows).forEach(([flowName, flow]) => {
+    it(`handles ${flow.description}`, async () => {
+      const user = userEvent.setup();
+      const element = render(<Component />);
+      
+      for (const step of flow.steps) {
+        await step.action(user, element);
+        await step.assert();
+      }
+    });
+  });
 });
 ```
 
