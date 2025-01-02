@@ -3,205 +3,138 @@
 ## Part 1: How to Write Perfect Tests First Time
 
 ### Core Principle
-The secret to writing perfect tests is to start with what works and build from there, rather than trying to test everything at once.
+The secret to writing perfect tests is to focus on user-visible behavior and accessibility first, implementation details last.
 
 ### Success-Driven Analysis Process
 
-#### 1. Component Analysis
+#### 1. Component Analysis (MANDATORY FIRST STEP)
+Before writing ANY test code:
 - Render the component manually in the app
-- Interact with it as a user
-- Note what you actually see change
-- Identify what stays the same
-- List the minimal interactions needed to verify it works
+- Interact with it as a user would
+- Write down EXACTLY what you see:
+  - What text is visible?
+  - What ARIA labels are present?
+  - What happens when you click/hover?
+  - What changes visually after interactions?
+- Use browser dev tools to inspect:
+  - Actual ARIA roles and labels
+  - Actual tooltip content
+  - Actual button text
+- Document the minimal steps to verify it works
 
-#### 2. Existing Tests Analysis (if available)
-- Run the test suite
-- Identify which tests pass consistently
-- Analyze what makes those tests reliable:
-  - Are they testing visible output?
-  - Are they using minimal mocks?
-  - Are they testing user interactions directly?
-- Use these patterns for new tests
-
-#### 3. Dependencies Analysis
-Critical: Only list dependencies that directly affect user-visible behavior
-- External routing (next/router)
-- UI framework components that handle user interactions
-- Animation libraries that affect clicking/interaction
-Skip dependencies that don't affect user-visible behavior
-
-### Test Writing Process
-
-#### 1. Start With What's Visible
+Example Analysis:
 ```typescript
-it('renders initial state', () => {
-  render(<Component />);
-  // Only check for things you can see in the browser
-  expect(screen.getByText('Visible Text')).toBeInTheDocument();
-});
+// Component: SidebarToggle
+// User-Visible Elements:
+// - Button with aria-label="Toggle Sidebar"
+// - Tooltip showing "Toggle Sidebar"
+// - Icon inside button
+
+// User Interactions:
+// - Click toggles sidebar
+// - Hover shows tooltip
+
+// What Changes:
+// - Sidebar opens/closes
+// - Tooltip appears/disappears
+
+// What Stays Same:
+// - Button position
+// - Icon presence
+// - Accessibility labels
 ```
 
-#### 2. Add One Interaction at a Time
-```typescript
-it('responds to primary interaction', async () => {
-  const user = userEvent.setup();
-  render(<Component />);
-  
-  // Simulate exactly what a user would do
-  await user.click(screen.getByRole('button', { name: 'Visible Button Text' }));
-  
-  // Verify only what changes visibly
-  expect(screen.getByText('New Visible Text')).toBeInTheDocument();
-});
-```
-
-### Test Organization Patterns
-
-Structure your tests to mirror user interaction patterns:
-
-```typescript
-describe('ComponentName', () => {
-  // 1. Setup and Rendering
-  describe('Rendering', () => {
-    it('renders initial state correctly')
-    it('handles conditional rendering cases')
-  });
-
-  // 2. User Interactions
-  describe('User Interactions', () => {
-    it('handles primary actions')
-    it('provides feedback for actions')
-  });
-
-  // 3. State Management
-  describe('State Management', () => {
-    it('handles enabled/disabled states')
-    it('reflects external state changes')
-  });
-});
-```
-
-### Test Setup Patterns
-
-Create a reusable setup function that encapsulates common test setup:
-
-```typescript
-const setup = (props = {}) => {
-  const user = userEvent.setup();
-  const utils = render(
-    <Component {...defaultProps} {...props} />
-  );
-  return {
-    user,
-    ...utils,
-  };
-};
-```
-
-This pattern:
-- Provides consistent component initialization
-- Makes test cases cleaner and more focused
-- Allows easy prop overrides for different scenarios
-
-### Testing UI Framework Components
-
-#### Radix UI and Other Headless Components
-When testing components that use headless UI libraries (like Radix UI):
-1. Mock the UI components at their usage level, not their implementation level
-2. Focus on testing the accessible roles and names that users interact with
-3. Test the visible content that users interact with, not the framework's implementation
-
-Example mock for Radix UI Tooltip:
-```typescript
-jest.mock('@/components/ui/tooltip', () => ({
-  Tooltip: ({ children }: any) => children,
-  TooltipTrigger: ({ children }: any) => (
-    <button type="button" aria-label="Copy">
-      {children}
-    </button>
-  ),
-  TooltipContent: ({ children }: any) => (
-    <div role="tooltip">{children}</div>
-  ),
-  TooltipProvider: ({ children }: any) => children,
-}));
-```
-
-Example test:
-```typescript
-it('shows tooltip content on hover', async () => {
-  const user = userEvent.setup();
-  render(<CopyButton />);
-  
-  // Find the button by its accessible name
-  const button = screen.getByRole('button', { name: 'Copy' });
-  
-  // Hover to show tooltip
-  await user.hover(button);
-  
-  // Verify tooltip content is shown
-  expect(screen.getByRole('tooltip')).toHaveTextContent('Copy to clipboard');
-});
-```
-
-### Testing Component Hierarchies
-
-When testing components that contain nested interactive elements:
-1. Use `within()` to scope your queries to specific elements
-2. Find parent containers by their role or content
-3. Use accessible roles and names to find child elements
+#### 2. Dependencies Analysis
+ONLY list dependencies that affect user-visible behavior:
+- ✅ DO Mock:
+  - Routing if it changes visible URLs
+  - Tooltips that users see
+  - Click handlers that change visible state
+  - Icons that users see
+- ❌ DON'T Mock:
+  - Styling utilities (like cn, cx)
+  - Internal state management
+  - Class merging logic
+  - Style-only components
 
 Example:
 ```typescript
-// DON'T: Find buttons directly at document level
-const button = screen.getByRole('button', { name: 'Copy' });
+// DO Mock (affects what user sees):
+jest.mock('@/components/ui/tooltip', () => ({
+  TooltipContent: ({ children }) => (
+    <div role="tooltip">{children}</div>
+  )
+}));
 
-// DO: Find container first, then button within it
-const dialog = screen.getByRole('dialog', { name: 'Share options' });
-const copyButton = within(dialog).getByRole('button', { name: 'Copy link' });
-
-// DO: Handle lists of similar items
-const todoList = screen.getByRole('list', { name: 'Todo items' });
-const items = within(todoList).getAllByRole('listitem');
-const deleteButtons = items.map(item => 
-  within(item).getByRole('button', { name: 'Delete' })
-);
+// DON'T Mock (implementation detail):
+jest.mock('@/lib/utils', () => ({
+  cn: (...inputs) => inputs.join(' ')
+}));
 ```
 
-### Common Testing Scenarios
+#### 3. Test Writing Process
+1. Start with Accessibility
+```typescript
+it('renders with correct accessibility', () => {
+  render(<Component />);
+  
+  // Find by ARIA role and label (what screen readers see)
+  const button = screen.getByRole('button', { 
+    name: 'Exact Label from Browser' 
+  });
+  expect(button).toBeInTheDocument();
+});
+```
 
-#### Testing Tooltips and Popovers
-- Mock the tooltip/popover components
-- Test the trigger and content separately
-- Verify tooltip text content directly
-- Don't test hover states unless critical to functionality
+2. Add Visible Content
+```typescript
+it('shows correct visible content', () => {
+  render(<Component />);
+  
+  // Check what users actually see
+  expect(screen.getByText('Exact Text from Browser')).toBeInTheDocument();
+  expect(screen.getByRole('tooltip')).toHaveTextContent('Exact Tooltip Text');
+});
+```
 
-#### Testing Async User Feedback
-- Use `waitFor` for async state changes
-- Test visible feedback (toasts, messages)
-- Verify both success and error states
-- Mock API calls at the fetch level
+3. Test User Interactions
+```typescript
+it('handles user interactions correctly', async () => {
+  const user = userEvent.setup();
+  render(<Component />);
+  
+  // Simulate exactly what users do
+  await user.click(screen.getByRole('button', { 
+    name: 'Exact Button Text' 
+  }));
+  
+  // Verify what visibly changes
+  expect(screen.getByText('New State Text')).toBeInTheDocument();
+});
+```
 
-#### Testing Interactive Icons
-- Test the button functionality, not the icon
-- Use role="button" for accessibility
-- Verify disabled states affect the whole interactive area
-- Test tooltip content for icon-only buttons
+### Common Mistakes to Avoid
+❌ DON'T:
+- Test implementation details (class names, internal state)
+- Mock styling utilities or class merging
+- Make assumptions about markup structure
+- Test framework-specific features
 
-### Warning Signs - Stop and Revise If You See These
-- You're mocking more than routing and UI framework components
-- You're testing something you can't see in the browser
-- Your test setup is more than 3-4 lines
-- You're simulating complex event chains
-- You're checking implementation details
+✅ DO:
+- Test what users see and interact with
+- Use ARIA roles and labels for queries
+- Mock only what affects user behavior
+- Verify visible changes after interactions
 
-### Success Checklist
+### Perfect Test Checklist
 Before writing any test code, verify:
-- [ ] You can see what you're testing in the browser
-- [ ] You know what changes visually with each interaction
-- [ ] You've identified working tests with similar patterns
-- [ ] You need minimal mocks (usually just router/UI framework)
-- [ ] Your test will verify visible changes only
+1. [ ] You've manually used the component in the app
+2. [ ] You've documented exact visible text and labels
+3. [ ] You've listed all user interactions
+4. [ ] You've noted what changes visually
+5. [ ] You've identified proper ARIA roles
+6. [ ] You've determined minimal mocks needed
+7. [ ] You're focusing only on user-visible behavior
 
 ## Part 2: Production Code Preservation
 
