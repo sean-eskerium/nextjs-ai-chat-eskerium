@@ -75,6 +75,89 @@ it('initializes editor', () => {
 });
 ```
 
+### Context Provider Setup Examples
+```typescript
+// 1. Document the provider hierarchy from the app
+// App.tsx or layout.tsx typically has:
+<ThemeProvider>
+  <TooltipProvider>
+    <DialogProvider>
+      {children}
+    </DialogProvider>
+  </TooltipProvider>
+</ThemeProvider>
+
+// 2. Create a test utility for common providers
+const renderWithProviders = (ui: React.ReactElement) => {
+  return render(
+    <TooltipProvider>
+      <ThemeProvider>
+        {ui}
+      </ThemeProvider>
+    </TooltipProvider>
+  );
+};
+
+// 3. Mock individual providers when needed
+jest.mock('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }) => children,
+  TooltipTrigger: ({ children }) => children,
+  TooltipContent: ({ children }) => <div>{children}</div>,
+  TooltipProvider: ({ children }) => <div>{children}</div>
+}));
+
+// 4. Example test with providers
+describe('ComponentWithProviders', () => {
+  it('renders with required providers', () => {
+    renderWithProviders(<MyComponent />);
+    expect(screen.getByRole('button')).toBeInTheDocument();
+  });
+
+  it('handles provider-dependent features', async () => {
+    renderWithProviders(<MyComponent />);
+    
+    // Test tooltip behavior
+    await userEvent.hover(screen.getByRole('button'));
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+  });
+});
+
+// 5. Testing provider state changes
+describe('ThemeAwareComponent', () => {
+  it('responds to theme changes', () => {
+    const { rerender } = renderWithProviders(
+      <ThemeProvider defaultTheme="light">
+        <MyComponent />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByTestId('theme-element')).toHaveClass('light');
+
+    rerender(
+      <ThemeProvider defaultTheme="dark">
+        <MyComponent />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByTestId('theme-element')).toHaveClass('dark');
+  });
+});
+
+### Component Mock Examples
+```typescript
+// Example for framer-motion:
+jest.mock('framer-motion', () => ({
+  motion: {
+    div: ({ children, ...props }) => (
+      <div {...props}>{children}</div>
+    )
+  }
+}));
+
+// Verification
+expect(screen.getByRole('button')).toHaveClass('motion-class');
+```
+
 ## Test Pattern Examples
 
 ### Component Lifecycle Pattern
@@ -737,5 +820,240 @@ describe('ConditionalComponent', () => {
     unmount();
     expect(cleanupMock).toHaveBeenCalled();
   });
+});
+``` 
+
+## Advanced Mocking Examples
+
+### SWR and Custom Hooks
+
+#### 1. Shared Mock Utilities
+```typescript
+// test-utils/swr-mocks.ts
+import type { Document } from '@/lib/db/schema';
+import type { SWRResponse, KeyedMutator } from 'swr';
+
+export interface SWRMockResponse<T> extends Partial<SWRResponse<T, any>> {
+  data?: T;
+  error?: Error;
+  isLoading?: boolean;
+  isValidating?: boolean;
+  mutate?: KeyedMutator<T>;
+}
+
+export interface SWRConfigValue {
+  mutate: (key: string) => Promise<any>;
+}
+
+export function createDocumentSWRMock(
+  data?: Document[],
+  isLoading = false,
+  error?: Error
+): SWRMockResponse<Document[]> {
+  const mutate = jest.fn().mockImplementation(async () => data);
+  
+  return {
+    data,
+    error,
+    isLoading,
+    isValidating: false,
+    mutate: mutate as unknown as KeyedMutator<Document[]>
+  };
+}
+
+export function createSWRConfigMock(): SWRConfigValue {
+  const mutate = jest.fn().mockImplementation(async () => undefined);
+  
+  return {
+    mutate
+  };
+}
+```
+
+#### 2. Component Test Setup
+```typescript
+// block.test.tsx
+import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import useSWR, { useSWRConfig } from 'swr';
+import type { Document } from '@/lib/db/schema';
+
+// Create stable mock data
+const mockDocuments = [{
+  id: 'test-doc',
+  title: 'Test Document',
+  content: 'test content',
+  kind: 'text',
+  createdAt: new Date(),
+  userId: 'test-user'
+}];
+
+// Create stable mock block
+const mockBlock = {
+  documentId: 'test-doc',
+  title: 'Test Document',
+  content: 'test content',
+  kind: 'text',
+  isVisible: true,
+  status: 'idle',
+  boundingBox: { top: 0, left: 0, width: 0, height: 0 }
+};
+
+// Create stable mock functions
+const mockSetBlock = jest.fn();
+const mockSetLocalBlock = jest.fn();
+const mockMutateDocuments = jest.fn().mockResolvedValue(mockDocuments);
+
+// Create stable hook mock
+const mockUseBlock = jest.fn().mockReturnValue({
+  block: mockBlock,
+  setBlock: mockSetBlock,
+  setLocalBlock: mockSetLocalBlock
+});
+
+// Mock modules
+jest.mock('@/hooks/use-block', () => ({
+  useBlock: () => mockUseBlock()
+}));
+
+jest.mock('swr', () => ({
+  __esModule: true,
+  default: jest.fn(),
+  useSWRConfig: jest.fn()
+}));
+
+describe('Block', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    // Reset hook mock to default state
+    mockUseBlock.mockReturnValue({
+      block: mockBlock,
+      setBlock: mockSetBlock,
+      setLocalBlock: mockSetLocalBlock
+    });
+
+    // Setup default SWR mock implementations
+    (useSWR as jest.Mock).mockImplementation((key) => {
+      if (!key) return { data: undefined, isLoading: false, mutate: mockMutateDocuments };
+      if (key.includes('/api/document')) {
+        return {
+          data: mockDocuments,
+          isLoading: false,
+          mutate: mockMutateDocuments
+        };
+      }
+      return { data: undefined, isLoading: false, mutate: mockMutateDocuments };
+    });
+
+    (useSWRConfig as jest.Mock).mockReturnValue({
+      mutate: jest.fn().mockResolvedValue(mockDocuments)
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('handles loading state', async () => {
+    // Override default mock for this test
+    mockUseBlock.mockReturnValue({
+      block: { ...mockBlock, content: '' },
+      setBlock: mockSetBlock,
+      setLocalBlock: mockSetLocalBlock
+    });
+
+    (useSWR as jest.Mock).mockImplementation((key) => {
+      if (key?.includes('/api/document')) {
+        return { data: undefined, isLoading: true, mutate: mockMutateDocuments };
+      }
+      return { data: undefined, isLoading: false, mutate: mockMutateDocuments };
+    });
+
+    render(<Block {...defaultProps} />);
+    
+    await waitFor(() => {
+      expect(screen.getByTestId('document-skeleton')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+### Key Patterns to Note
+
+1. **Stable Mock Data**
+   - Mock data is defined at the module level
+   - Uses proper types from the actual implementation
+   - Represents a realistic data shape
+   - Is immutable between tests
+
+2. **Stable Mock Functions**
+   - Created at the module level
+   - Reset in beforeEach
+   - Use proper TypeScript types
+   - Have consistent return values
+
+3. **Hook Mocking**
+   - Mock the entire module
+   - Use a stable mock implementation
+   - Reset to default state in beforeEach
+   - Override only when needed for specific tests
+
+4. **SWR Mocking**
+   - Handle conditional fetching
+   - Provide mutate functions
+   - Match the exact shape of SWR responses
+   - Handle loading and error states
+
+5. **Test Organization**
+   - Clear separation of mock setup and tests
+   - Consistent reset pattern in beforeEach
+   - Test-specific overrides are explicit
+   - Async operations handled properly
+
+### Common Patterns for Different Scenarios
+
+1. **Conditional Fetching**
+```typescript
+(useSWR as jest.Mock).mockImplementation((key) => {
+  if (!key) return { data: undefined, isLoading: false };
+  // ... handle different keys
+});
+```
+
+2. **Loading States**
+```typescript
+it('shows loading state', async () => {
+  (useSWR as jest.Mock).mockImplementation(() => ({
+    data: undefined,
+    isLoading: true,
+    mutate: mockMutate
+  }));
+});
+```
+
+3. **Error States**
+```typescript
+it('handles errors', async () => {
+  (useSWR as jest.Mock).mockImplementation(() => ({
+    data: undefined,
+    error: new Error('Test error'),
+    isLoading: false,
+    mutate: mockMutate
+  }));
+});
+```
+
+4. **State Updates**
+```typescript
+it('updates state', async () => {
+  const mockMutate = jest.fn().mockImplementation(async () => {
+    // Simulate state update
+    return [...mockDocuments, newDocument];
+  });
+
+  (useSWR as jest.Mock).mockImplementation(() => ({
+    data: mockDocuments,
+    mutate: mockMutate
+  }));
 });
 ``` 

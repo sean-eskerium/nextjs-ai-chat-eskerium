@@ -32,9 +32,21 @@ Before writing ANY test code:
   - Parent-child relationships
   - Nested UI components
   - Dialog/modal layers
+  - Required context providers
+  - UI library wrapper components
+- Use React DevTools to inspect:
+  - Provider components in parent tree
+  - UI library requirements (e.g., Radix UI, shadcn/ui)
+  - Global providers from layout files
+  - Component composition patterns
 - Document the minimal steps to verify it works
+- Document provider requirements:
+  - Theme providers
+  - Tooltip providers
+  - Dialog providers
+  - Other UI library providers
 
-For examples of DOM structure analysis and state mapping, see `unit-testing-examples.md`.
+For examples of DOM structure analysis, state mapping, and provider setup, see `unit-testing-examples.md`.
 
 #### 2. Dependencies Analysis
 ONLY list dependencies that affect user-visible behavior:
@@ -45,13 +57,16 @@ ONLY list dependencies that affect user-visible behavior:
   - Icons that users see
   - Animation components (e.g., framer-motion)
   - Window/document methods used in handlers
+  - UI library providers that affect rendering
+  - Context providers required for components
 - ❌ DON'T Mock:
   - Styling utilities (like cn, cx)
   - Internal state management
   - Class merging logic
   - Style-only components
+  - Providers that don't affect behavior
 
-For examples of mocking strategies, see `unit-testing-examples.md`.
+For examples of mocking strategies and provider setup, see `unit-testing-examples.md`.
 
 #### 3. Basic Test Writing Process
 
@@ -167,6 +182,10 @@ Before writing any test code, verify:
 8. [ ] You've mapped out all multi-step processes
 9. [ ] You've identified all component dependencies
 10. [ ] You've planned specific selectors for similar elements
+11. [ ] You've identified all required context providers
+12. [ ] You've checked UI library component requirements
+13. [ ] You've inspected the component's usage in the real app
+14. [ ] You've documented provider hierarchy and setup
 
 ## Part 2: Component Analysis and Test Writing
 > These are critical steps for writing comprehensive tests
@@ -766,3 +785,186 @@ When encountering difficulties making tests work with production code:
    - Verify cleanup on unmount
    - Test transitions between states
    - See `unit-testing-examples.md` for conditional rendering examples
+
+## Part 3: Mocking Best Practices
+> These guidelines ensure consistent and maintainable mocks across the test suite
+
+### Mocking Strategy
+1. Create Stable Mock Data
+   - Define mock data at the top of the file
+   - Use interfaces/types from the actual implementation
+   - Keep mock data minimal but complete
+   - Make mock data reusable across tests
+
+2. Mock Function Strategy
+   - Create mock functions that match the real implementation's signature
+   - Use jest.fn() with mockImplementation for complex behavior
+   - Clear mocks in beforeEach to prevent test pollution
+   - Document mock function behavior
+
+3. Hook Mocking Guidelines
+   - Mock the entire module, not individual functions
+   - Create stable mock implementations
+   - Return consistent data structures
+   - Include all required hook return values
+   - Handle loading and error states
+
+4. Data Fetching Mocks (e.g., SWR)
+   - Mock at the module level
+   - Include loading, error, and success states
+   - Provide stable mutate functions
+   - Match the exact shape of hook returns
+   - Handle conditional fetching logic
+
+### Common Mocking Patterns
+
+1. Module Mocking
+```typescript
+// ❌ DON'T: Mock individual exports
+const mockSetBlock = jest.fn();
+export const useBlock = () => ({ setBlock: mockSetBlock });
+
+// ✅ DO: Mock the entire module
+jest.mock('@/hooks/use-block', () => ({
+  useBlock: () => mockUseBlock()
+}));
+```
+
+2. Hook Return Values
+```typescript
+// ❌ DON'T: Return partial implementations
+const mockHook = () => ({ data: mockData });
+
+// ✅ DO: Return complete implementations
+const mockHook = () => ({
+  data: mockData,
+  isLoading: false,
+  error: undefined,
+  mutate: jest.fn()
+});
+```
+
+3. Stable Mock Functions
+```typescript
+// ❌ DON'T: Create new functions in each test
+it('test case', () => {
+  const mockFn = jest.fn();
+  // ...
+});
+
+// ✅ DO: Create stable functions and reset in beforeEach
+const mockFn = jest.fn();
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+```
+
+### Testing Data Fetching Libraries
+
+1. SWR Mocking Pattern
+```typescript
+// 1. Create mock utilities
+interface SWRMockResponse<T> {
+  data?: T;
+  error?: Error;
+  isLoading: boolean;
+  mutate: jest.Mock;
+}
+
+// 2. Create stable mock implementations
+const createSWRMock = <T>(config: Partial<SWRMockResponse<T>>): SWRMockResponse<T> => ({
+  data: undefined,
+  error: undefined,
+  isLoading: false,
+  mutate: jest.fn(),
+  ...config
+});
+
+// 3. Use in tests
+jest.mock('swr', () => ({
+  __esModule: true,
+  default: jest.fn(),
+  useSWRConfig: jest.fn()
+}));
+```
+
+### Best Practices for Test Organization
+
+1. Mock Setup
+```typescript
+// 1. Define types and interfaces
+type MockData = {
+  // ...
+};
+
+// 2. Create stable mock data
+const mockData: MockData = {
+  // ...
+};
+
+// 3. Create mock functions
+const mockFn = jest.fn();
+
+// 4. Create mock hook implementation
+const mockHook = jest.fn().mockReturnValue({
+  // ...
+});
+
+// 5. Mock modules
+jest.mock('./path', () => ({
+  useHook: () => mockHook()
+}));
+```
+
+2. Test Structure
+```typescript
+describe('Component', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Reset mock implementations
+    mockHook.mockReturnValue({
+      // Default implementation
+    });
+  });
+
+  it('test case', () => {
+    // Override mock for specific test if needed
+    mockHook.mockReturnValue({
+      // Test-specific implementation
+    });
+  });
+});
+```
+
+### Common Pitfalls to Avoid
+
+1. Mocking Stability
+   - ❌ DON'T create new mock implementations in each test
+   - ❌ DON'T modify shared mock data between tests
+   - ✅ DO create stable mocks at the module level
+   - ✅ DO reset mock state in beforeEach
+
+2. Type Safety
+   - ❌ DON'T ignore TypeScript errors in mocks
+   - ❌ DON'T use any to bypass type checks
+   - ✅ DO ensure mocks match real implementations
+   - ✅ DO use proper types for mock data
+
+3. Mock Scope
+   - ❌ DON'T mock more than necessary
+   - ❌ DON'T mock implementation details
+   - ✅ DO mock at the module level
+   - ✅ DO focus on behavior over implementation
+
+### Testing Checklist for Mocks
+
+Before implementing mocks:
+1. [ ] Identify what needs to be mocked
+2. [ ] Document the real implementation's interface
+3. [ ] Create stable mock data
+4. [ ] Set up module-level mocks
+5. [ ] Implement proper type safety
+6. [ ] Plan for loading/error states
+7. [ ] Create reusable mock utilities
+8. [ ] Document mock behavior
+9. [ ] Test mock reset strategy
