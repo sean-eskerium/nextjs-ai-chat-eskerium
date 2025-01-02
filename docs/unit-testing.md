@@ -955,4 +955,214 @@ Common Pitfalls:
 - ✅ Test visible changes based on prop updates
 - ✅ Test callback behavior with user interactions
 
-// ... existing code ... 
+### Component Mocking Best Practices
+
+#### 1. Mock Pattern Analysis
+Before writing ANY mocks:
+- Find similar component tests in the codebase
+- Note how they mock complex UI libraries
+- Document the established patterns
+- Use consistent mock patterns across tests
+
+Example Analysis:
+```typescript
+// DON'T: Make assumptions about internal behavior
+jest.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenuItem: () => (
+    <div role="menuitem" data-highlighted={isHighlighted}>
+      {children}
+    </div>
+  )
+}));
+
+// DO: Follow established patterns with data-testid
+jest.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenuItem: ({ children, onSelect }) => (
+    <div 
+      data-testid="dropdown-item"
+      role="menuitem" 
+      onClick={onSelect}
+    >
+      {children}
+    </div>
+  )
+}));
+```
+
+#### 2. UI Library Mocking Guidelines
+- ✅ DO Mock:
+  - Component structure (parent-child relationships)
+  - Event handlers (click, keydown)
+  - Accessibility attributes (role, aria-*)
+  - Data test IDs for querying
+- ❌ DON'T Mock:
+  - Internal state management
+  - Focus/highlight behavior
+  - Animation states
+  - Complex UI library features
+
+Example:
+```typescript
+// DON'T: Try to replicate internal behavior
+jest.mock('@/components/ui/menu', () => ({
+  Menu: () => {
+    const [isOpen, setIsOpen] = useState(false);
+    return <div>{isOpen && children}</div>;
+  }
+}));
+
+// DO: Keep mocks simple and focused on structure
+jest.mock('@/components/ui/menu', () => ({
+  Menu: ({ children }) => (
+    <div data-testid="menu">{children}</div>
+  )
+}));
+```
+
+#### 3. Component Query Strategy
+Order of preference for queries:
+1. `data-testid` for structural components
+2. ARIA roles for interactive elements
+3. Text content for user-visible elements
+4. Alt text for images
+5. Other attributes as last resort
+
+Example:
+```typescript
+// DON'T: Mix query strategies
+const menu = screen.getByTestId('menu');
+const button = within(menu).getByText('Click me');
+
+// DO: Use consistent query strategy
+const menu = screen.getByTestId('menu');
+const button = within(menu).getByRole('button', { name: 'Click me' });
+```
+
+### Test Setup Patterns
+
+#### 1. Use Setup Functions
+ALWAYS create a setup function that:
+- Handles common render logic
+- Provides user-event instance
+- Allows prop overrides
+- Returns useful utilities
+
+Example:
+```typescript
+const setup = (props = {}) => {
+  const user = userEvent.setup();
+  const utils = render(
+    <Provider>
+      <Component {...defaultProps} {...props} />
+    </Provider>
+  );
+  return {
+    user,
+    ...utils,
+  };
+};
+```
+
+#### 2. Mock Reset Strategy
+- Reset ALL mocks in beforeEach
+- Set up default mock returns
+- Document mock requirements
+
+Example:
+```typescript
+describe('Component', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useSomeHook as jest.Mock).mockReturnValue({
+      data: defaultData,
+      action: jest.fn(),
+    });
+  });
+});
+```
+
+### Testing Complex Interactions
+
+#### 1. User Action Testing
+Focus on user-visible results:
+- ✅ Test what changed visually
+- ✅ Test what callbacks were called
+- ✅ Test accessibility states
+- ❌ Don't test internal state
+- ❌ Don't test implementation details
+
+Example:
+```typescript
+// DON'T: Test implementation
+expect(component.state.isOpen).toBe(true);
+
+// DO: Test user-visible results
+expect(screen.getByRole('menu')).toBeInTheDocument();
+expect(mockCallback).toHaveBeenCalled();
+```
+
+#### 2. Keyboard Navigation
+Focus on achievable results:
+- ✅ Test tab navigation
+- ✅ Test Enter/Space activation
+- ✅ Test Escape closing
+- ✅ Test presence of elements
+- ❌ Don't test focus management
+- ❌ Don't test highlight states
+
+Example:
+```typescript
+// DON'T: Test internal focus management
+expect(menuItem).toHaveFocus();
+
+// DO: Test visible results
+await user.tab();
+await user.keyboard('{Enter}');
+expect(screen.getByRole('menu')).toBeInTheDocument();
+```
+
+### Common Pitfalls to Avoid
+
+1. **Over-testing Library Features**
+   - ❌ Testing Radix UI's focus management
+   - ❌ Testing React Hook Form validation
+   - ✅ Test your integration with these libraries
+
+2. **Inconsistent Query Strategies**
+   - ❌ Mixing getByRole and getByTestId randomly
+   - ✅ Follow the established query hierarchy
+
+3. **Complex Mock Implementation**
+   - ❌ Trying to replicate library behavior
+   - ✅ Mock only what's needed for your test
+
+4. **Testing Implementation Details**
+   - ❌ Testing component state
+   - ❌ Testing private methods
+   - ✅ Test user-visible behavior
+
+### Perfect Test Checklist
+
+Before writing code:
+1. [ ] Find and analyze similar component tests
+2. [ ] Document the established mock patterns
+3. [ ] List all required providers
+4. [ ] Plan query strategy
+5. [ ] Identify user-visible behaviors
+6. [ ] Note required keyboard interactions
+
+During implementation:
+1. [ ] Create setup function first
+2. [ ] Follow established mock patterns
+3. [ ] Use consistent query strategy
+4. [ ] Focus on user-visible behavior
+5. [ ] Test actual outcomes, not implementation
+
+After implementation:
+1. [ ] Verify mock consistency
+2. [ ] Check query strategy consistency
+3. [ ] Ensure no implementation details are tested
+4. [ ] Verify provider setup
+5. [ ] Compare with similar tests
+
+// ... rest of existing content ... 
