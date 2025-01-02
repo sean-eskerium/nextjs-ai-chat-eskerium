@@ -1,253 +1,247 @@
-# Fuse React Integration Migration Plan
+# Fuse React Integration Migration Plan (Fully Prescriptive)
 
 ## 1. Analysis of Current State
 
 ### Chat App (Current Workspace)
-- Next.js 13+ App Router based application
+- Next.js 13+ App Router based application in the project root
 - Core functionality: AI Chat interface
-- Current structure follows standard Next.js conventions
-- Uses modern features like server components and server actions
+- Directories: /app, /components, /hooks, /lib, plus config files
+- Uses modern Next.js features (server components, server actions)
 
-### Fuse React Template
-- Comprehensive UI framework with established patterns
-- Rich component library and theming system
-- Structured `/src` directory with clear separation of concerns
-- Built-in authentication and state management
+### Fuse React Skeleton
+- “Fuse-React-v13.0.0-nextjs-skeleton”
+- A minimal Fuse-based layout with “src/” folder
+- Next.js 13+ structure, integrated with Fuse theming, layout, navigation
+
+### Fuse React Demo
+- “Fuse-React-v13.0.0-nextjs-demo”
+- A full-featured example app
+- We will selectively copy files from here into the skeleton if needed for advanced UI features
 
 ## 2. Migration Goals
-- Preserve Chat app functionality
-- Adopt Fuse React's navigation and layout
-- Maintain code quality and testing
-- Zero functionality regression
+1. Preserve Chat app functionality (no breakage).
+2. Use Fuse layout/navigation for the Chat feature.
+3. Merge all config files into one coherent environment.
+4. Harmonize dependencies in a single package.json, favoring the Fuse skeleton’s versions.
+5. End up with a predictable directory layout under “src/”.
 
-## 3. Directory Structure Integration
+## 3. Final Directory Layout Under Skeleton
 
-### Target Structure
+After merging, the skeleton’s “src/” folder will look like this:
+
 ```
 src/
-  @fuse/          # Fuse core functionality
-  @auth/          # Authentication (merge with existing auth)
-  @i18n/          # Internationalization
-  app/            # Next.js app directory
-    (chat)/       # Chat app routes
-    (auth)/       # Auth routes
-    api/          # API routes
+  @fuse/            # Fuse core library (leave this untouched)   
+  @auth/            # Auth config from skeleton or your app, if present
+  @i18n/            # i18n config from skeleton or your app
+  app/              # Next.js app router
+    (control-panel)   # We place all control panel features here
+      (chat)/         # Your Chat app’s pages, formerly in /app
+      ...other routes from Chat app as needed
+    api/              # API routes (if your Chat uses them)
+    layout.tsx        # Possibly the top-level or other layout
+    page.tsx          # Possibly a home page if you want
   components/
-    shared/       # Shared UI components
-    chat/         # Chat-specific components
-    fuse/         # Fuse-specific components
-  contexts/       # React contexts
-  store/          # State management
-  hooks/          # Custom hooks
-  utils/          # Utility functions
-  configs/        # Configuration files
-  styles/         # Global styles
+    shared/         # Shared UI components (if we discover any in your app)
+    chat/           # Chat-specific components from /components
+  hooks/            # All React hooks from /hooks
+  store/            # App-wide state (if you have a Redux or Zustand store)
+  utils/            # Utility functions from /lib
+  configs/          # Merged config files from Chat app + skeleton
+  styles/           # If you have a /styles folder, put it here
 ```
 
-## 4. Migration Phases
+## 4. Merging package.json & Dependencies
 
-### Phase 1: Setup and Dependencies
-1. Create new project structure
-   ```bash
-   mkdir -p src/{@fuse,@auth,@i18n,app,components/{shared,chat,fuse},contexts,store,hooks,utils,configs,styles}
-   ```
+1. Open both:
+   - <root>/package.json (your current Chat app)
+   - <fuse-skeleton>/package.json
+2. For overlapping dependencies (e.g., next, react, typescript, eslint, tailwindcss), keep the Fuse skeleton’s version.  
+3. Add any missing or unique dependencies from your Chat app to the skeleton’s package.json.  
+4. Copy any scripts from your Chat app (e.g., "test", "lint", "dev:local") into the skeleton’s. Rename or unify them if needed.  
+5. Remove or rename your old package.json (e.g., package.old.json) in the original root.  
+6. Run “npm install” or “yarn install” in the skeleton folder to confirm no version conflicts.  
 
-2. Merge dependencies
-   - Compare package.json files
-   - Resolve version conflicts
-   - Update build configurations
+## 5. Exact File Moves from Root → Skeleton
 
-3. Configuration Integration
-   - Merge Next.js configurations
-   - Update TypeScript paths
-   - Combine environment variables
-   - Merge tailwind configurations
+Below is how we map each root folder to the skeleton. We assume you want your Chat routes in “(control-panel)/(chat)”. If you see a /styles or /store in your Chat app, we’ll place them accordingly:
 
-### Phase 2: Core Infrastructure Migration
-1. Authentication
-   - Move existing auth to `src/@auth`
-   - Integrate with Fuse auth system
-   - Update auth providers and hooks
+- /app --> src/app/(control-panel)/(chat)  
+  - If there’s an existing Next.js setup with index routes, copy them here.  
+- /components --> src/components/chat  
+  - If you have something obviously “shared” (like a “Modal” or “Button” used by multiple features), move that into src/components/shared.  
+- /hooks --> src/hooks  
+- /lib --> src/utils  
+- /styles (if it exists) --> src/styles  
+- All config files (tailwind.config.js, next.config.js, tsconfig.json, etc.) --> either root level (like tailwind.config.js, next.config.js) or inside src/configs if it’s strictly used by the code.  
+- .env.* (if any) --> keep them in the new skeleton’s root.  
 
-2. Layout Integration
-   - Implement Fuse layout system
-   - Create chat-specific layouts
-   - Setup navigation structure
+## 6. Automatic Migration Script
 
-3. State Management
-   - Move existing state to `src/store`
-   - Integrate with Fuse state management
-   - Update store providers
+We’ll create “tools/migrate-chat.sh” in your skeleton folder. Update paths as needed (for example, if your original Chat code is in “../OriginalChatApp”). The script does:
 
-### Phase 3: Component Migration
-1. UI Components
-   - Move shared components to `src/components/shared`
-   - Move chat components to `src/components/chat`
-   - Update component imports
+1. Moves the entire /app → src/app/(control-panel)/(chat).  
+2. Moves /components → src/components/chat.  
+3. Moves /hooks and /lib similarly.  
+4. Optionally moves /styles if present.  
+5. Copies config files.  
+6. Runs sed to update import statements.  
 
-2. Chat Functionality
-   - Move chat logic to appropriate directories
-   - Update API routes
-   - Preserve server actions
+Below is a near-complete script. Validate the “RELATIVE_PATH_TO_OLD_APP” so it points to your current Chat project.
 
-3. Styling Integration
-   - Merge tailwind configurations
-   - Update component styling
-   - Ensure theme compatibility
+```bash:tools/migrate-chat.sh
+#!/usr/bin/env bash
 
-### Phase 4: Route Migration
-1. Page Structure
-   - Move chat routes to `src/app/(chat)`
-   - Update layout components
-   - Preserve API routes
+################################################################################
+# 0) Initial path checks
+################################################################################
+if [ ! -d "src" ]; then
+  echo "Error: Run this script from the Fuse skeleton folder (where 'src' exists)."
+  exit 1
+fi
 
-2. API Integration
-   - Move API routes to appropriate structure
-   - Update API handlers
-   - Maintain endpoint functionality
+RELATIVE_PATH_TO_OLD_APP="../OriginalChatApp" 
+# Adjust if your old Chat code is in another location
 
-### Phase 5: Testing and Verification
-1. Test Migration
-   - Update test paths
-   - Migrate test utilities
-   - Ensure test coverage
+################################################################################
+# 1) Move /app => src/app/(control-panel)/(chat)
+################################################################################
+mkdir -p src/app/(control-panel)/(chat)
+if [ -d "$RELATIVE_PATH_TO_OLD_APP/app" ]; then
+  mv "$RELATIVE_PATH_TO_OLD_APP/app/"* src/app/(control-panel)/(chat)/
+  echo "Moved /app into src/app/(control-panel)/(chat)."
+else
+  echo "No /app directory found at $RELATIVE_PATH_TO_OLD_APP."
+fi
 
-2. Integration Testing
-   - Verify chat functionality
-   - Test navigation flow
-   - Validate authentication
+################################################################################
+# 2) Move /components => src/components/chat
+################################################################################
+mkdir -p src/components/chat
+if [ -d "$RELATIVE_PATH_TO_OLD_APP/components" ]; then
+  mv "$RELATIVE_PATH_TO_OLD_APP/components/"* src/components/chat/
+  echo "Moved /components into src/components/chat."
+else
+  echo "No /components directory found at $RELATIVE_PATH_TO_OLD_APP."
+fi
 
-## 5. Implementation Steps
+################################################################################
+# 3) Move /hooks => src/hooks
+################################################################################
+mkdir -p src/hooks
+if [ -d "$RELATIVE_PATH_TO_OLD_APP/hooks" ]; then
+  mv "$RELATIVE_PATH_TO_OLD_APP/hooks/"* src/hooks/
+  echo "Moved /hooks into src/hooks."
+fi
 
-### Step 1: Project Setup
-```bash
-# Create directory structure
-mkdir -p src/{@fuse,@auth,@i18n,app/(chat),components/{shared,chat,fuse},contexts,store,hooks,utils,configs,styles}
+################################################################################
+# 4) Move /lib => src/utils (or keep it as src/lib if you prefer)
+################################################################################
+mkdir -p src/utils
+if [ -d "$RELATIVE_PATH_TO_OLD_APP/lib" ]; then
+  mv "$RELATIVE_PATH_TO_OLD_APP/lib/"* src/utils/
+  echo "Moved /lib into src/utils."
+fi
 
-# Copy Fuse core files
-cp -r Fuse-React-v13.0.0-nextjs-demo/src/@fuse ./src/
-cp -r Fuse-React-v13.0.0-nextjs-demo/src/@auth ./src/
-cp -r Fuse-React-v13.0.0-nextjs-demo/src/@i18n ./src/
+################################################################################
+# 5) Move /styles => src/styles (if present)
+################################################################################
+if [ -d "$RELATIVE_PATH_TO_OLD_APP/styles" ]; then
+  mkdir -p src/styles
+  mv "$RELATIVE_PATH_TO_OLD_APP/styles/"* src/styles/
+  echo "Moved /styles into src/styles."
+fi
+
+################################################################################
+# 6) Move config files => unify at skeleton root or /src/configs
+################################################################################
+# Example for tailwind.config.js, next.config.js, etc.
+# Because these typically belong in the root with Next.js:
+for cf in tailwind.config.js next.config.js tsconfig.json; do
+  if [ -f "$RELATIVE_PATH_TO_OLD_APP/$cf" ]; then
+    echo "Moving $cf to the skeleton root (overwrites if it exists)."
+    mv "$RELATIVE_PATH_TO_OLD_APP/$cf" "./"
+  fi
+done
+
+################################################################################
+# 7) Move .env files if present => skeleton root
+################################################################################
+for envfile in .env .env.local .env.production .env.development; do
+  if [ -f "$RELATIVE_PATH_TO_OLD_APP/$envfile" ]; then
+    echo "Moving $envfile to skeleton root."
+    mv "$RELATIVE_PATH_TO_OLD_APP/$envfile" "./$envfile"
+  fi
+done
+
+################################################################################
+# 8) Rewrite import paths with sed
+################################################################################
+# This section adjusts your code to reflect new paths. 
+# We'll demonstrate a few common replacements. 
+# You may need to add more depending on how your imports are structured.
+
+# If your code used `import something from '@/app/...`, 
+# then we might need to rewrite these references to '@/app/(control-panel)/(chat)'
+grep -rl "from '@/app/" src | xargs sed -i '' "s|from '@/app/|from '@/app/(control-panel)/(chat)/|g"
+
+# If your code used `import Something from '@/components/...` for Chat stuff, 
+# rewrite to '@/components/chat/...'
+grep -rl "from '@/components/" src | xargs sed -i '' "s|from '@/components/|from '@/components/chat/|g"
+
+# If your code used `import Something from '@/hooks/'`,
+# we can keep that the same if we plan to keep the alias as @/hooks
+# (No rewrite needed unless your code references a now-nonexistent path)
+
+# If your code used `import Something from '@/lib/'`,
+# rewrite it to `import Something from '@/utils/`
+grep -rl "from '@/lib/" src | xargs sed -i '' "s|from '@/lib/|from '@/utils/|g"
+
+# If your code used `import Something from '@/styles/'`,
+# rewrite it to `import Something from '@/styles/`
+# (No rename needed unless you changed the folder name or alias)
+
+echo "Sed-based import rewriting complete."
+
+################################################################################
+# 9) Final message
+################################################################################
+echo "Migration script is done. Please review changes, then run 'npm install' or 'yarn' and test."
+
+exit 0
 ```
 
-### Step 2: Dependencies and Configuration
-1. Merge package.json
-```json
-{
-  "dependencies": {
-    // Existing chat app dependencies
-    // + Fuse React dependencies
-  }
-}
-```
+Notes on imports:  
+• We included the most common rewrites. You may need to add more if your code references “@/components/shared” or other special paths.  
+• If your existing code uses purely relative imports (“../../../lib/xyz”), you may prefer your editor’s “auto import correction” or a more advanced script.  
 
-2. Update Next.js configuration
+## 7. Post-Migration Verification
+1. From your skeleton folder, run “npm install” or “yarn” if you haven’t yet.  
+2. Try “npm run dev” or “yarn dev.”  
+3. Check that “/(control-panel)/chat” loads your Chat page.  
+4. Inspect your imports. If you see fallback errors (e.g., “Cannot find module …”), do a quick grep to see what path wasn’t updated.  
+5. Merge or fix any leftover config duplication.  
+
+## 8. Fuse Layout & Navigation
+- In “src/@fuse/navigation” (or near where the skeleton config is), add an item linking to the “/(control-panel)/chat” route with an icon, e.g.:
+
 ```typescript
-// next.config.mjs
-export default {
-  // Merge configurations from both projects
-}
+const navigationConfig = [
+  {
+    id: 'chat',
+    title: 'Chat',
+    type: 'item',
+    icon: 'chat',
+    url: '/control-panel/chat',
+  },
+];
+
+export default navigationConfig;
 ```
 
-### Step 3: Component Migration
-1. Move components:
-```bash
-# Move chat components
-mv components/chat src/components/chat/
-mv components/ui src/components/shared/
-```
+- Adjust layout: If your code references a “layout” in “/app/(control-panel)/layout.tsx,” ensure you wrap Chat pages with `<FuseLayout>` or the appropriate Fuse component.  
 
-2. Update imports:
-```typescript
-// Old imports
-import { Button } from '@/components/ui/button'
-// New imports
-import { Button } from '@/components/shared/button'
-```
-
-### Step 4: Route Migration
-1. Move pages:
-```bash
-# Move chat routes
-mv app/(chat)/* src/app/(chat)/
-```
-
-2. Update layouts:
-```typescript
-// src/app/(chat)/layout.tsx
-import { FuseLayout } from '@/components/fuse/layout'
-
-export default function ChatLayout({ children }) {
-  return <FuseLayout>{children}</FuseLayout>
-}
-```
-
-## 6. Testing Strategy
-
-### Unit Tests
-- Migrate test files with components
-- Update import paths
-- Maintain test coverage
-
-### Integration Tests
-- Add new tests for Fuse integration
-- Verify navigation flows
-- Test state management
-
-### E2E Tests
-- Update Cypress/Playwright tests
-- Add navigation scenarios
-- Test full user flows
-
-## 7. Rollback Strategy
-
-### Git Strategy
-- Create feature branch
-- Commit logical chunks
-- Maintain ability to revert
-
-### Backup
-- Snapshot database
-- Document all changes
-- Version control checkpoints
-
-## 8. Success Criteria
-
-### Functionality
-- Chat works as before
-- Navigation is smooth
-- Authentication works
-- State management preserved
-
-### Performance
-- No degradation in load times
-- Efficient bundle sizes
-- Smooth animations
-
-### Code Quality
-- Clean import structure
-- Consistent styling
-- Maintained test coverage
-
-## 9. Post-Migration Tasks
-
-### Documentation
-- Update README
-- Document new structure
-- Update API documentation
-
-### Optimization
-- Bundle size analysis
-- Performance monitoring
-- Cache strategy review
-
-### Training
-- Team documentation
-- Codebase walkthrough
-- Best practices guide
-
-## Next Steps
-1. Review and approve plan
-2. Set up new project structure
-3. Begin phased migration
-4. Regular testing and verification 
+## 9. Next Steps
+1. Test thoroughly with your existing unit & integration tests.  
+2. Slowly bring in advanced demo features if you want (e.g., more Material UI components from “Fuse-React-v13.0.0-nextjs-demo”).  
+3. Keep commits small and descriptive so you can revert if needed. 
