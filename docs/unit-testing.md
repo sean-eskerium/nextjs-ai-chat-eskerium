@@ -5,6 +5,9 @@
 ### Core Principle
 The secret to writing perfect tests is to focus on user-visible behavior and accessibility first, implementation details last.
 
+### Pro Tip
+Analyze the __tests___ folder as those are working tests. 
+
 ### Success-Driven Analysis Process
 
 #### 1. Component Analysis (MANDATORY FIRST STEP)
@@ -16,30 +19,65 @@ Before writing ANY test code:
   - What ARIA labels are present?
   - What happens when you click/hover?
   - What changes visually after interactions?
+  - What multi-step processes exist?
+  - What confirmation dialogs appear?
 - Use browser dev tools to inspect:
   - Actual ARIA roles and labels
   - Actual tooltip content
   - Actual button text
+  - Modal/dialog content
+  - Menu structures
+- Map out component hierarchy:
+  - Parent-child relationships
+  - Nested UI components
+  - Dialog/modal layers
 - Document the minimal steps to verify it works
 
 Example Analysis:
 ```typescript
-// Component: SidebarToggle
-// User-Visible Elements:
-// - Button with aria-label="Toggle Sidebar"
-// - Tooltip showing "Toggle Sidebar"
-// - Icon inside button
+// Component: SidebarHistory
+// Component Hierarchy:
+// ├── SidebarMenuItem (for each chat)
+// │   ├── DropdownMenu
+// │   │   ├── DropdownMenuTrigger ("More" button)
+// │   │   └── DropdownMenuContent
+// │   │       └── DropdownMenuItem ("Delete" option)
+// │   └── Dialog
+// │       ├── DialogTrigger
+// │       └── DialogContent
+// │           ├── DialogHeader
+// │           └── DialogFooter
 
-// User Interactions:
-// - Click toggles sidebar
-// - Hover shows tooltip
+// User-Visible Elements:
+// - List of chat items with titles
+// - "More" button for each chat (aria-label="More")
+// - Dropdown menu with "Delete" and "Share" options
+// - Confirmation dialog for deletion
+// - Loading skeletons during data fetch
+// - Empty state message when no chats
+
+// Multi-Step Processes:
+// 1. Deletion Flow:
+//    - Click "More" button
+//    - Click "Delete" in dropdown
+//    - Confirm in dialog
+//    - See success toast
+//    - Chat disappears from list
+// 2. Share Flow:
+//    - Click "More" button
+//    - Click "Share"
+//    - Select visibility
+//    - See visibility update
 
 // What Changes:
-// - Sidebar opens/closes
-// - Tooltip appears/disappears
+// - Chat list updates after deletion
+// - Visibility icon changes
+// - Loading states show/hide
+// - Dialogs open/close
+// - Toast notifications appear
 
 // What Stays Same:
-// - Button position
+// - Button positions
 // - Icon presence
 // - Accessibility labels
 ```
@@ -97,19 +135,58 @@ it('shows correct visible content', () => {
 });
 ```
 
-3. Test User Interactions
+3. Test Multi-Step Processes
 ```typescript
-it('handles user interactions correctly', async () => {
+it('handles complete deletion flow', async () => {
   const user = userEvent.setup();
   render(<Component />);
   
-  // Simulate exactly what users do
-  await user.click(screen.getByRole('button', { 
-    name: 'Exact Button Text' 
-  }));
+  // 1. Initial state verification
+  expect(screen.queryByTestId('dialog')).not.toBeInTheDocument();
   
-  // Verify what visibly changes
-  expect(screen.getByText('New State Text')).toBeInTheDocument();
+  // 2. Open dropdown
+  await user.click(screen.getByTestId('dropdown-trigger'));
+  expect(screen.getByTestId('dropdown-content')).toBeInTheDocument();
+  
+  // 3. Click delete
+  await user.click(screen.getByText('Delete'));
+  expect(screen.getByTestId('dialog')).toBeInTheDocument();
+  
+  // 4. Confirm deletion
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  
+  // 5. Verify all side effects
+  expect(fetch).toHaveBeenCalledWith(
+    expect.stringContaining('/api/chat'),
+    expect.objectContaining({ method: 'DELETE' })
+  );
+  expect(mutate).toHaveBeenCalled();
+  expect(toast.success).toHaveBeenCalled();
+  expect(screen.queryByText('Test Chat')).not.toBeInTheDocument();
+});
+```
+
+4. Test State Transitions
+```typescript
+it('handles state transitions correctly', async () => {
+  const user = userEvent.setup();
+  render(<Component />);
+
+  // 1. Initial state
+  expect(screen.getByTestId('initial-state')).toBeInTheDocument();
+
+  // 2. Loading state
+  await user.click(screen.getByRole('button'));
+  expect(screen.getByTestId('loading-state')).toBeInTheDocument();
+
+  // 3. Success state
+  await waitFor(() => {
+    expect(screen.getByTestId('success-state')).toBeInTheDocument();
+  });
+
+  // 4. Final state verification
+  expect(screen.queryByTestId('loading-state')).not.toBeInTheDocument();
+  expect(screen.getByTestId('success-state')).toBeInTheDocument();
 });
 ```
 
@@ -119,12 +196,20 @@ it('handles user interactions correctly', async () => {
 - Mock styling utilities or class merging
 - Make assumptions about markup structure
 - Test framework-specific features
+- Miss steps in multi-step processes
+- Assume dialogs are immediately visible
+- Use ambiguous selectors for similar elements
+- Skip confirmation steps
 
 ✅ DO:
 - Test what users see and interact with
 - Use ARIA roles and labels for queries
 - Mock only what affects user behavior
 - Verify visible changes after interactions
+- Document complete interaction flows
+- Wait for dialog animations
+- Use specific selectors for similar elements
+- Handle all confirmation steps
 
 ### Perfect Test Checklist
 Before writing any test code, verify:
@@ -135,6 +220,9 @@ Before writing any test code, verify:
 5. [ ] You've identified proper ARIA roles
 6. [ ] You've determined minimal mocks needed
 7. [ ] You're focusing only on user-visible behavior
+8. [ ] You've mapped out all multi-step processes
+9. [ ] You've identified all component dependencies
+10. [ ] You've planned specific selectors for similar elements
 
 ## Part 2: Production Code Preservation
 
