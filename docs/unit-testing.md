@@ -968,3 +968,22 @@ Before implementing mocks:
 7. [ ] Create reusable mock utilities
 8. [ ] Document mock behavior
 9. [ ] Test mock reset strategy
+
+### Testing Icon Components
+1. **DON'T use data-testid for icons**
+   ```typescript
+   // ❌ DON'T: Look for data-testid
+   const icon = screen.getByTestId('loader-icon');
+   
+   // ✅ DO: Test for SVG element and its properties
+   const icon = container.querySelector('svg');
+   expect(icon).toHaveAttribute('height', '16');
+   expect(icon).toHaveAttribute('width', '16');
+   ```
+
+2. **Icon Testing Best Practices**
+   - Test for SVG element presence
+   - Verify size props are applied correctly
+   - Check for proper styling classes
+   - Verify parent container classes for animations
+   - Use container.querySelector for SVG elements
