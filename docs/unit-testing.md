@@ -272,44 +272,300 @@ Before writing any test code, verify:
    - Verify cleanup
    - Test error conditions
 
-## Part 4: Advanced Testing Considerations
-> After basic tests are working, consider these aspects for comprehensive testing
+## Part 4: Advanced Testing Patterns
 
-### State Management Analysis
-- [ ] Document all state variables and their purposes
-- [ ] Map state transitions and side effects
-- [ ] Identify optimistic updates and loading states
-- [ ] Understand error state handling
-- [ ] Review state initialization
-- [ ] Document state dependencies between components
-- [ ] Map async state updates
-- [ ] Identify state persistence requirements
-- [ ] List conditions required for state changes
-- [ ] Document state prerequisites for callbacks
+### Async Operation Testing
+1. **Choosing the Right Wait Method**
+   ```typescript
+   // ❌ DON'T: Use multiple separate waits
+   await waitFor(() => expect(api).toHaveBeenCalled());
+   await waitFor(() => expect(setMessages).toHaveBeenCalled());
+   
+   // ✅ DO: Group related async expectations
+   await waitFor(() => {
+     expect(api).toHaveBeenCalled();
+     expect(setMessages).toHaveBeenCalled();
+   });
+   
+   // ✅ DO: Use findBy for elements that appear
+   const errorMessage = await screen.findByText('Error occurred');
+   
+   // ✅ DO: Use waitForElementToBeRemoved for disappearing elements
+   await waitForElementToBeRemoved(() => screen.queryByText('Loading...'));
+   ```
 
-### UI/UX Flow Analysis
-- [ ] Map all possible user interaction paths
-- [ ] Document expected behavior for each interaction
-- [ ] List all visual states and transitions
-- [ ] Identify accessibility requirements
-- [ ] Document keyboard navigation flows
-- [ ] Map focus management requirements
-- [ ] List animation states and triggers
-- [ ] Document responsive behavior
-- [ ] Identify multi-step interactions
-- [ ] Map out complete interaction sequences
+2. **Testing Loading States**
+   ```typescript
+   it('shows and hides loading state', async () => {
+     const user = userEvent.setup();
+     render(<Component />);
+     
+     // Click action that triggers loading
+     await user.click(screen.getByRole('button'));
+     
+     // Verify loading state
+     expect(screen.getByRole('button')).toBeDisabled();
+     expect(screen.getByText('Loading...')).toBeInTheDocument();
+     
+     // Wait for loading to complete
+     await waitForElementToBeRemoved(() => screen.queryByText('Loading...'));
+     
+     // Verify final state
+     expect(screen.getByRole('button')).toBeEnabled();
+   });
+   ```
 
-### Technical Dependencies
-- [ ] List all external libraries used
-- [ ] Document UI framework-specific features
-- [ ] Note any custom hooks or utilities
-- [ ] Identify performance considerations
-- [ ] List required providers
-- [ ] Document API dependencies
-- [ ] Map WebSocket interactions
-- [ ] Review build dependencies
-- [ ] Understand animation library requirements
-- [ ] Document testing library limitations
+3. **Sequential Async Operations**
+   ```typescript
+   it('handles multi-step async process', async () => {
+     const user = userEvent.setup();
+     
+     // Setup mocks with delayed responses
+     const mockApi = jest.fn().mockImplementation(() => 
+       new Promise(resolve => setTimeout(resolve, 100))
+     );
+     
+     render(<Component api={mockApi} />);
+     
+     // Start process
+     await user.click(screen.getByRole('button', { name: 'Start' }));
+     
+     // Verify first loading state
+     expect(screen.getByText('Step 1...')).toBeInTheDocument();
+     
+     // Wait for first step to complete
+     await waitForElementToBeRemoved(() => screen.queryByText('Step 1...'));
+     
+     // Verify intermediate state
+     expect(screen.getByText('Step 2...')).toBeInTheDocument();
+     
+     // Wait for final state
+     await waitFor(() => {
+       expect(screen.getByText('Complete')).toBeInTheDocument();
+     });
+   });
+   ```
+
+### Advanced Mock Setup
+
+1. **Hook Mocking Patterns**
+   ```typescript
+   // ❌ DON'T: Use simple return values for complex hooks
+   jest.mock('useMyHook', () => jest.fn());
+   
+   // ✅ DO: Mock complete hook interface
+   jest.mock('useMyHook', () => ({
+     useMyHook: jest.fn().mockReturnValue({
+       data: mockData,
+       loading: false,
+       error: null,
+       mutate: jest.fn(),
+     })
+   }));
+   
+   // ✅ DO: Document hook dependencies
+   /**
+    * Hook Dependencies:
+    * - data: Required for initial render
+    * - loading: Controls loading state
+    * - error: Required for error handling
+    * - mutate: Called on form submit
+    */
+   ```
+
+2. **Mock Verification in Async Context**
+   ```typescript
+   it('verifies mock calls after async operations', async () => {
+     const mockSetMessages = jest.fn();
+     
+     render(<Component setMessages={mockSetMessages} />);
+     
+     // Trigger async operation
+     await user.click(screen.getByRole('button'));
+     
+     // Wait for all async operations
+     await waitFor(() => {
+       // Verify mock was called
+       expect(mockSetMessages).toHaveBeenCalled();
+       
+       // Get the updater function
+       const updater = mockSetMessages.mock.calls[0][0];
+       
+       // Verify the update logic
+       const result = updater(previousMessages);
+       expect(result).toEqual(expectedMessages);
+     });
+   });
+   ```
+
+3. **Error State Mocking**
+   ```typescript
+   describe('error handling', () => {
+     it('handles API errors', async () => {
+       // Mock API error
+       const mockError = new Error('API Error');
+       mockApi.mockRejectedValueOnce(mockError);
+       
+       render(<Component />);
+       
+       // Trigger error
+       await user.click(screen.getByRole('button'));
+       
+       // Verify error state
+       await waitFor(() => {
+         expect(screen.getByText('Error: API Error')).toBeInTheDocument();
+         expect(screen.getByRole('button')).toBeEnabled();
+       });
+       
+       // Verify error cleanup
+       await user.click(screen.getByRole('button', { name: 'Retry' }));
+       expect(screen.queryByText('Error:')).not.toBeInTheDocument();
+     });
+   });
+   ```
+
+### State Management Testing
+
+1. **Testing State Updates with Side Effects**
+   ```typescript
+   it('updates state and triggers side effects', async () => {
+     const mockSetState = jest.fn();
+     const mockSideEffect = jest.fn();
+     
+     render(<Component setState={mockSetState} onUpdate={mockSideEffect} />);
+     
+     // Trigger state change
+     await user.click(screen.getByRole('button'));
+     
+     // Wait for all effects
+     await waitFor(() => {
+       // Verify state update
+       expect(mockSetState).toHaveBeenCalledWith(expect.any(Function));
+       
+       // Verify side effect
+       expect(mockSideEffect).toHaveBeenCalledWith(newState);
+     });
+   });
+   ```
+
+2. **Testing State Transitions**
+   ```typescript
+   it('handles state transitions correctly', async () => {
+     render(<Component />);
+     
+     // Initial state
+     expect(screen.getByText('Initial')).toBeInTheDocument();
+     
+     // Trigger transition
+     await user.click(screen.getByRole('button'));
+     
+     // Loading state
+     expect(screen.getByText('Loading...')).toBeInTheDocument();
+     
+     // Wait for final state
+     await waitForElementToBeRemoved(() => screen.queryByText('Loading...'));
+     expect(screen.getByText('Complete')).toBeInTheDocument();
+     
+     // Verify no loading artifacts
+     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+   });
+   ```
+
+3. **Testing Error State Transitions**
+   ```typescript
+   it('handles error state transitions', async () => {
+     // Mock API to fail
+     mockApi.mockRejectedValueOnce(new Error('Failed'));
+     
+     render(<Component />);
+     
+     // Initial state
+     expect(screen.getByText('Initial')).toBeInTheDocument();
+     
+     // Trigger error
+     await user.click(screen.getByRole('button'));
+     
+     // Loading state
+     expect(screen.getByText('Loading...')).toBeInTheDocument();
+     
+     // Wait for error state
+     await waitForElementToBeRemoved(() => screen.queryByText('Loading...'));
+     expect(screen.getByText('Error: Failed')).toBeInTheDocument();
+     
+     // Verify recovery
+     await user.click(screen.getByRole('button', { name: 'Retry' }));
+     expect(screen.queryByText('Error:')).not.toBeInTheDocument();
+   });
+   ```
+
+### Testing Loading States and Visual Patterns
+
+1. **Loading Skeleton Components**
+   ```typescript
+   // ❌ DON'T: Try to find loading elements by ARIA roles
+   const skeleton = screen.getByRole('region', { name: /loading/i });
+   
+   // ✅ DO: Use DOM structure and class selectors
+   const { container } = render(<LoadingSkeleton />);
+   const skeleton = container.firstChild as HTMLElement;
+   const bars = skeleton.querySelectorAll('div[class*="animate-pulse"]');
+   ```
+
+2. **CSS Class Testing**
+   ```typescript
+   // ❌ DON'T: Test classes separately
+   expect(element).toHaveClass('animate-pulse');
+   expect(element).toHaveClass('rounded-lg');
+   
+   // ✅ DO: Group related classes
+   expect(element).toHaveClass('animate-pulse rounded-lg');
+   
+   // ✅ DO: Test classes by purpose
+   // Animation classes
+   expect(element).toHaveClass('animate-pulse');
+   // Layout classes
+   expect(element).toHaveClass('flex flex-col gap-4');
+   // Visual state classes
+   expect(element).toHaveClass('bg-muted-foreground/20');
+   ```
+
+3. **Visual Pattern Testing**
+   ```typescript
+   // ❌ DON'T: Test each element individually
+   skeletonBars.forEach((bar, index) => {
+     expect(bar).toHaveClass('animate-pulse');
+     if (index === 0) expect(bar).toHaveClass('w-1/2');
+     if (index === 1) expect(bar).toHaveClass('w-full');
+   });
+   
+   // ✅ DO: Destructure and test with clear names
+   const [
+     titleBar,
+     firstLine,
+     secondLine,
+     // ...
+   ] = Array.from(elements);
+   
+   // Title bar
+   expect(titleBar).toHaveClass('h-12 w-1/2');
+   
+   // Content lines
+   expect(firstLine).toHaveClass('h-5 w-full');
+   ```
+
+4. **Common Loading State Patterns**
+   - Document the purpose of each skeleton element
+   - Group similar elements (e.g., content lines)
+   - Test both unique and common properties
+   - Verify animation classes
+   - Check responsive classes if applicable
+
+5. **Visual Testing Best Practices**
+   - Start with container structure
+   - Test layout classes first
+   - Verify individual element styles
+   - Group common class tests
+   - Document visual patterns
 
 ## Part 5: Production Code Preservation
 
@@ -451,3 +707,62 @@ When encountering difficulties making tests work with production code:
   - Real-world component examples
 - Check `__tests__` folder for working examples
 - Review Jest and Testing Library documentation for best practices 
+
+## Part 4: Advanced Component Testing Guidelines
+
+### Testing Resizable Components
+1. Setup Requirements
+   - Mock window dimensions consistently
+   - Mock initial component state
+   - Setup proper event handling
+   - See `unit-testing-examples.md` for setup examples
+
+2. Test Cases to Cover
+   - Initial render state
+   - Enter/exit resize mode
+   - Resize within bounds (min/max)
+   - Proper cleanup of event listeners
+
+3. Best Practices
+   - Wrap state updates in act()
+   - Test boundary conditions (min/max)
+   - Verify cleanup of event listeners
+   - Test resize mode visual indicators
+   - See `unit-testing-examples.md` for implementation examples
+
+### Enhanced State Update Testing
+1. Common Issues
+   - State changes not reflected in tests
+   - Race conditions in async updates
+   - Missing state transitions
+
+2. Best Practices
+   - Use act() for state updates
+   - Separate act() calls for different state changes
+   - Wait for all state updates to complete
+   - See `unit-testing-examples.md` for state update patterns
+
+### Testing Components with Refs
+1. Mock Behavior
+   - Mock ref methods (e.g., scrollIntoView)
+   - Setup ref behavior in beforeEach
+   - Clear mocks between tests
+
+2. Best Practices
+   - Mock only necessary ref methods
+   - Verify ref method calls
+   - Test ref behavior on state changes
+   - See `unit-testing-examples.md` for ref testing examples
+
+### Testing Conditional Rendering
+1. Test Cases
+   - Component renders nothing (null case)
+   - Component renders with minimal data
+   - Component renders with full data
+   - Component updates on data changes
+
+2. Best Practices
+   - Test boundary conditions
+   - Verify cleanup on unmount
+   - Test transitions between states
+   - See `unit-testing-examples.md` for conditional rendering examples
