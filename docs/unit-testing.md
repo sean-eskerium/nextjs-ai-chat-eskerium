@@ -1,406 +1,161 @@
-# Unit Testing Documentation
+# Unit Testing Guide
 
-## Overview
+## Test Preparation Checklist
 
-This document outlines our unit testing strategy for the application, specifically focused on ensuring component dependencies and imports continue to work correctly during the transition to the Fuse React directory structure.
+Before writing any test file, complete these steps:
 
-## Testing Stack
+1. **Analyze Component Implementation**
+   - Read the component's source code completely
+   - Understand the component's purpose and functionality
+   - Note any conditional rendering logic
+   - Identify all props and their types
+   - Check for any hooks or context usage
 
-- **Jest**: Our primary testing framework
-- **React Testing Library**: For testing React components
-- **@testing-library/jest-dom**: For additional DOM testing utilities
-- **@testing-library/user-event**: For simulating user interactions
-- **web-streams-polyfill**: For mocking streaming responses in tests
+2. **Type Analysis**
+   - Identify and import all required types/interfaces
+   - Check for any custom type definitions
+   - Understand union types and their constraints
+   - Note any generic type parameters
+   - Review prop type definitions thoroughly
 
-## Test Organization
+3. **Dependencies**
+   - List all external dependencies
+   - Plan mock implementations
+   - Check for any context providers needed
+   - Identify any required test utilities
+   - Note any global setup requirements
 
-Our tests are organized in the `__tests__` directory, mirroring the structure of our source code:
+4. **Test Strategy**
+   - Plan test categories (rendering, interaction, etc.)
+   - List all test cases
+   - Identify edge cases
+   - Plan mock data structure
+   - Consider test isolation requirements
 
-```
-__tests__/
-  components/
-    ui/           # UI component tests
-    chat.test.tsx # Chat component tests
-    ...
-  app/
-    api/          # API route tests
-    chat/         # Chat page tests
-  config/        # Test configuration
-    setup.ts     # Global test setup
-```
+## Writing Clean Tests
 
-## Test Driven Development (TDD)
+### First-Time-Right Approach
 
-### Overview
-We follow a TDD approach for all new features and modifications. The process is:
+1. **Setup Phase**
+   ```typescript
+   // 1. Import all required dependencies and types
+   import * as React from 'react';
+   import { render, screen } from '@testing-library/react';
+   import type { RequiredType } from './types';
+   
+   // 2. Mock external dependencies
+   jest.mock('external-dep', () => ({
+     someFunction: jest.fn()
+   }));
+   
+   // 3. Prepare test data
+   const mockData: RequiredType = {
+     // Use correct types from the start
+   };
+   ```
 
-1. Write tests first based on expected behavior
-2. Run tests (they should fail)
-3. Implement the feature
-4. Run tests again (they should pass)
-5. Refactor if needed while keeping tests passing
+2. **Test Structure**
+   ```typescript
+   describe('ComponentName', () => {
+     // Common test setup
+     const defaultProps = {
+       // Use proper types for all props
+     };
 
-### TDD Process for Different Components
+     beforeEach(() => {
+       // Reset mocks and common setup
+     });
 
-#### API Routes
+     // Group related tests
+     describe('rendering', () => {
+       // Rendering tests
+     });
+
+     describe('interactions', () => {
+       // Interaction tests
+     });
+   });
+   ```
+
+### Common Pitfalls to Avoid
+
+1. **Type-Related Issues**
+   - Don't assume prop types without checking
+   - Always import required types
+   - Use proper type assertions
+   - Handle union types correctly
+
+2. **Mock-Related Issues**
+   - Mock all external dependencies
+   - Provide proper mock implementations
+   - Reset mocks between tests
+   - Mock at the correct level
+
+3. **Test Data Issues**
+   - Use properly typed mock data
+   - Avoid hardcoding test values
+   - Use meaningful test data
+   - Handle edge cases
+
+## Testing Complex Components
+
+### Component with Multiple States
 ```typescript
-// 1. Write the test first
-describe('POST /api/chat', () => {
-  it('handles chat message creation', async () => {
-    const mockRequest = {
-      json: () => Promise.resolve({
-        messages: [{ role: 'user', content: 'Hello' }],
-        id: 'test-chat',
-        modelId: 'test-model',
-      }),
-    };
+// 1. Define all possible states
+const states = {
+  default: { /* ... */ },
+  loading: { /* ... */ },
+  error: { /* ... */ }
+} as const;
 
-    const response = await POST(mockRequest as any);
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
-  });
-});
-
-// 2. Implement the route handler
-export async function POST(req: Request) {
-  const body = await req.json();
-  // Implementation follows...
-}
-```
-
-#### React Components
-```typescript
-// 1. Write the test first
-describe('ChatInput', () => {
-  it('submits message on enter', async () => {
-    const onSubmit = jest.fn();
-    render(<ChatInput onSubmit={onSubmit} />);
-    
-    const input = screen.getByRole('textbox');
-    await userEvent.type(input, 'Hello{enter}');
-    
-    expect(onSubmit).toHaveBeenCalledWith('Hello');
-  });
-});
-
-// 2. Implement the component
-export function ChatInput({ onSubmit }: Props) {
-  // Implementation follows...
-}
-```
-
-### TDD Guidelines
-
-1. **Test Structure**
-   - Write descriptive test names that explain the behavior
-   - Group related tests using `describe` blocks
-   - Use `beforeEach` for common setup
-   - Clean up after tests using `afterEach`
-
-2. **Test Coverage**
-   - Aim for 90%+ coverage on new code
-   - Test both success and error cases
-   - Test edge cases and boundary conditions
-
-3. **Mocking Strategy**
-   - Mock external dependencies
-   - Use Jest's mock functions for callbacks
-   - Keep mocks as simple as possible
-
-## Testing Strategy
-
-### 1. Component Import Testing
-
-The primary goal is to ensure components can load their dependencies correctly. Each test should verify:
-
-- Component can be imported
-- Required sub-components are available
-- Props are correctly typed
-- Basic rendering works
-
-### 2. Component Categories
-
-#### UI Components (`components/ui/`)
-- Simple, self-contained components
-- Focus on basic rendering and prop validation
-- Examples: Button, Input, Select
-
-#### Feature Components (`components/`)
-- More complex, composed components
-- Focus on dependency loading and basic functionality
-- Examples: Chat, Message, Editor
-
-### 3. Mock Strategy
-
-We use several types of mocks to isolate components:
-
-#### Global Mocks (in `__tests__/config/setup.ts`)
-```typescript
-// Mock streaming responses
-global.ReadableStream = ReadableStream;
-global.TransformStream = TransformStream;
-global.Response = class extends Object {
-  constructor(body?: BodyInit | null, init?: ResponseInit) {
-    super();
-    Object.assign(this, {
-      status: init?.status || 200,
-      headers: new Headers(init?.headers),
-      body: body,
-    });
-  }
-} as any;
-
-// Mock TextDecoder
-class MockTextDecoder {
-  encoding = 'utf-8';
-  fatal = false;
-  ignoreBOM = false;
-  decode() {
-    return 'test response';
-  }
-}
-global.TextDecoder = MockTextDecoder as any;
-```
-
-#### Component-Level Mocks
-```typescript
-jest.mock('../../components/toolbar', () => ({
-  Toolbar: () => <div data-testid="mock-toolbar" />
-}));
-```
-
-#### API Mocks
-```typescript
-jest.mock('ai', () => {
-  const mockStream = new ReadableStream({
-    start(controller) {
-      controller.enqueue('test response');
-      controller.close();
-    },
-  });
-
-  const mockResponse = new Response(mockStream, {
-    headers: { 'content-type': 'text/plain; charset=utf-8' },
-  });
-  mockResponse.mergeIntoDataStream = jest.fn();
-
-  return {
-    StreamingTextResponse: jest.fn().mockImplementation(() => mockResponse),
-    experimental_StreamData: jest.fn(),
-    // ... other mocks
-  };
-});
-```
-
-## Test Coverage Goals
-
-### Priority 1: Core Components
-- `chat.tsx`
-- `message.tsx`
-- `markdown.tsx`
-- `editor.tsx`
-- All UI components
-- All API routes
-
-### Priority 2: Feature Components
-- `toolbar.tsx`
-- `sidebar-history.tsx`
-- `document.tsx`
-- `block.tsx`
-
-### Priority 3: Utility Components
-- `icons.tsx`
-- `theme-provider.tsx`
-- Other utility components
-
-## Test Implementation Guide
-
-### 1. Basic Component Test Template
-
-```typescript
-import { render, screen } from '@testing-library/react';
-import { ComponentName } from './path-to-component';
-
-describe('ComponentName', () => {
-  it('renders successfully', () => {
-    render(<ComponentName />);
-    // Basic assertions
+// 2. Test each state
+Object.entries(states).forEach(([stateName, stateProps]) => {
+  it(`renders correctly in ${stateName} state`, () => {
+    render(<Component {...stateProps} />);
+    // Assertions
   });
 });
 ```
 
-### 2. Complex Component Test Template
-
+### Components with Context
 ```typescript
-import { render, screen } from '@testing-library/react';
-import { ComponentName } from './path-to-component';
+// 1. Create context wrapper
+const wrapper = ({ children }) => (
+  <ContextProvider value={mockContextValue}>
+    {children}
+  </ContextProvider>
+);
 
-// Mock dependencies
-jest.mock('./dependency', () => ({
-  DependencyComponent: () => <div data-testid="mock-dependency" />
-}));
-
-describe('ComponentName', () => {
-  const mockProps = {
-    // Define required props
-  };
-
-  beforeEach(() => {
-    // Setup before each test
-    jest.clearAllMocks();
-  });
-
-  it('renders with all dependencies', () => {
-    render(<ComponentName {...mockProps} />);
-    // Verify dependencies are loaded
-  });
+// 2. Use in tests
+it('works with context', () => {
+  render(<Component />, { wrapper });
 });
 ```
 
-### 3. API Route Test Template
+## Best Practices for Clean Tests
 
-```typescript
-import { POST } from './route';
+1. **Preparation**
+   - Always analyze component before writing tests
+   - Understand all types and interfaces
+   - Plan test cases before implementation
+   - Prepare mock data with correct types
 
-describe('API Route', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+2. **Implementation**
+   - Write tests in logical groups
+   - Use meaningful test descriptions
+   - Keep tests focused and isolated
+   - Follow AAA pattern (Arrange, Act, Assert)
 
-  it('handles successful request', async () => {
-    const mockRequest = {
-      json: () => Promise.resolve({ /* request body */ }),
-    };
+3. **Maintenance**
+   - Keep tests simple and readable
+   - Use helper functions for common operations
+   - Document complex test setups
+   - Update tests when component changes
 
-    const response = await POST(mockRequest as any);
-    expect(response.status).toBe(200);
-    
-    // For streaming responses
-    const reader = response.body?.getReader();
-    const { value } = await reader?.read() || {};
-    const text = new TextDecoder().decode(value);
-    expect(text).toBe('expected response');
-  });
-});
-```
+4. **Type Safety**
+   - Use TypeScript's type system effectively
+   - Avoid type assertions when possible
+   - Keep types in sync with implementation
+   - Test edge cases of union types
 
-## Common Testing Patterns
-
-### 1. Provider Components
-
-Components that require providers should be wrapped:
-
-```typescript
-const renderWithProviders = (ui: React.ReactElement) => {
-  return render(
-    <TooltipProvider>
-      {ui}
-    </TooltipProvider>
-  );
-};
-```
-
-### 2. Streaming Response Testing
-
-For components or routes that use streaming:
-
-```typescript
-// Mock streaming response
-const mockStream = new ReadableStream({
-  start(controller) {
-    controller.enqueue('test response');
-    controller.close();
-  },
-});
-
-const mockResponse = new Response(mockStream, {
-  headers: { 'content-type': 'text/plain; charset=utf-8' },
-});
-mockResponse.mergeIntoDataStream = jest.fn();
-```
-
-### 3. Next.js Specific Mocks
-
-```typescript
-// Mock Next.js navigation
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-  }),
-  notFound: jest.fn(),
-}));
-
-// Mock Next.js headers
-jest.mock('next/headers', () => ({
-  cookies: () => ({
-    get: jest.fn(),
-    set: jest.fn(),
-  }),
-  headers: () => new Map(),
-}));
-```
-
-## Test Execution
-
-### Running Tests
-
-```bash
-# Run all tests
-pnpm test
-
-# Run specific test file
-pnpm test path/to/test
-
-# Run tests in watch mode
-pnpm test --watch
-
-# Run tests with coverage
-pnpm test --coverage
-```
-
-### Debugging Tests
-
-1. Use `screen.debug()` to view the rendered DOM
-2. Use `console.log` with `beforeEach` to debug setup
-3. Use Jest's `--verbose` flag for detailed output
-4. Use the debugger statement in tests
-5. Use VS Code's Jest extension for inline debugging
-
-## Best Practices
-
-1. **Test First Development**
-   - Write tests before implementing features
-   - Use tests to drive the design
-   - Keep tests focused and minimal
-
-2. **Mock Strategy**
-   - Mock external dependencies
-   - Mock complex child components
-   - Keep mocks simple and maintainable
-   - Use Jest's mock functions for callbacks
-
-3. **Maintainability**
-   - Group related tests
-   - Use descriptive test names
-   - Keep test files focused
-   - Update tests when modifying code
-
-4. **Coverage**
-   - Maintain high coverage for critical paths
-   - Test error conditions
-   - Test edge cases
-   - Don't sacrifice quality for coverage
-
-## Next Steps
-
-1. Complete test coverage for UI components
-2. Add tests for feature components
-3. Add tests for utility functions
-4. Set up CI/CD integration
-5. Implement automated coverage reporting
-
-## Conclusion
-
-This testing strategy ensures our components and features are thoroughly tested using a TDD approach. The tests serve as both documentation and a safety net, quickly identifying any issues during development and refactoring. 
+Remember: The time spent understanding the component and its types before writing tests will save more time than fixing lint errors afterward. 

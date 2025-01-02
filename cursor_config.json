@@ -176,6 +176,98 @@
           "Verify tests pass with good coverage"
         ]
       }
-    ]
+    ],
+    "testPreparation": {
+      "preWritingChecklist": {
+        "componentAnalysis": [
+          "Read component source code",
+          "Understand component purpose",
+          "Identify all props and types",
+          "Note conditional rendering",
+          "Check hooks and context usage"
+        ],
+        "typePreparation": [
+          "List all required types/interfaces",
+          "Check custom type definitions",
+          "Note union types and constraints",
+          "Review prop type definitions"
+        ],
+        "dependencyAnalysis": [
+          "List external dependencies",
+          "Plan mock implementations",
+          "Identify context providers",
+          "Note required test utilities"
+        ]
+      },
+      "commonIssues": {
+        "typeErrors": {
+          "symptoms": [
+            "Missing type imports",
+            "Incorrect prop types",
+            "Type assertion errors",
+            "Union type handling issues"
+          ],
+          "solutions": [
+            "Import all types before writing tests",
+            "Check component prop types in source",
+            "Use proper type assertions",
+            "Handle all union type cases"
+          ]
+        },
+        "mockErrors": {
+          "symptoms": [
+            "Missing mock implementations",
+            "Incorrect mock behavior",
+            "Context provider errors",
+            "Hook usage errors"
+          ],
+          "solutions": [
+            "Mock all external dependencies first",
+            "Match real component behavior",
+            "Provide required context",
+            "Mock hooks correctly"
+          ]
+        }
+      },
+      "testingStrategy": {
+        "preparation": {
+          "order": [
+            "1. Read and understand component",
+            "2. List all required types",
+            "3. Plan mock implementations",
+            "4. Write test cases list",
+            "5. Implement tests"
+          ],
+          "bestPractices": [
+            "Group related tests logically",
+            "Use descriptive test names",
+            "Test edge cases",
+            "Verify types before implementation"
+          ]
+        }
+      }
+    },
+    "testImplementation": {
+      "fileStructure": {
+        "imports": [
+          "React and testing libraries",
+          "Component under test",
+          "Types and interfaces",
+          "Mock dependencies"
+        ],
+        "setup": [
+          "Mock implementations",
+          "Default props",
+          "Test data",
+          "Helper functions"
+        ],
+        "testGroups": [
+          "Rendering tests",
+          "Interaction tests",
+          "Edge cases",
+          "Error handling"
+        ]
+      }
+    }
   }
   

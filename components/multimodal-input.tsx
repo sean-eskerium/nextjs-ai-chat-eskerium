@@ -20,8 +20,8 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
-
-import { sanitizeUIMessages } from '@/lib/utils';
+import { cn, sanitizeUIMessages } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
 
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
@@ -111,6 +111,10 @@ function PureMultimodalInput({
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
 
   const submitForm = useCallback(() => {
+    if (!input.trim() && !attachments.length) {
+      return;
+    }
+
     window.history.replaceState({}, '', `/chat/${chatId}`);
 
     handleSubmit(undefined, {
@@ -124,6 +128,7 @@ function PureMultimodalInput({
       textareaRef.current?.focus();
     }
   }, [
+    input,
     attachments,
     handleSubmit,
     setAttachments,
@@ -142,20 +147,22 @@ function PureMultimodalInput({
         body: formData,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const { url, pathname, contentType } = data;
+      const data = await response.json();
 
+      if (response.ok) {
+        const { url, pathname, contentType } = data;
         return {
           url,
           name: pathname,
-          contentType: contentType,
+          contentType,
         };
       }
-      const { error } = await response.json();
-      toast.error(error);
+    
+      toast.error('Failed to upload file, please try again!');
+      return undefined;
     } catch (error) {
       toast.error('Failed to upload file, please try again!');
+      return undefined;
     }
   };
 
@@ -169,15 +176,15 @@ function PureMultimodalInput({
         const uploadPromises = files.map((file) => uploadFile(file));
         const uploadedAttachments = await Promise.all(uploadPromises);
         const successfullyUploadedAttachments = uploadedAttachments.filter(
-          (attachment) => attachment !== undefined,
+          (attachment): attachment is NonNullable<typeof attachment> => attachment !== undefined,
         );
 
-        setAttachments((currentAttachments) => [
-          ...currentAttachments,
-          ...successfullyUploadedAttachments,
-        ]);
+        if (successfullyUploadedAttachments.length > 0) {
+          setAttachments(successfullyUploadedAttachments);
+        }
       } catch (error) {
         console.error('Error uploading files!', error);
+        toast.error('Failed to upload file, please try again!');
       } finally {
         setUploadQueue([]);
       }
@@ -200,6 +207,7 @@ function PureMultimodalInput({
         multiple
         onChange={handleFileChange}
         tabIndex={-1}
+        data-testid="file-input"
       />
 
       {(attachments.length > 0 || uploadQueue.length > 0) && (
@@ -232,16 +240,21 @@ function PureMultimodalInput({
           className,
         )}
         rows={2}
-        autoFocus
+        autoFocus={width ? width > 768 : false}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
 
             if (isLoading) {
               toast.error('Please wait for the model to finish its response!');
-            } else {
-              submitForm();
+              return;
             }
+
+            if (!input.trim() && !attachments.length) {
+              return;
+            }
+
+            submitForm();
           }
         }}
       />
@@ -284,17 +297,20 @@ function PureAttachmentsButton({
   isLoading: boolean;
 }) {
   return (
-    <Button
-      className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
+    <button
+      className={cn(
+        buttonVariants({ variant: 'ghost' }),
+        'hover:text-accent-foreground rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200'
+      )}
       onClick={(event) => {
         event.preventDefault();
         fileInputRef.current?.click();
       }}
       disabled={isLoading}
-      variant="ghost"
+      aria-label="attach file"
     >
       <PaperclipIcon size={14} />
-    </Button>
+    </button>
   );
 }
 
@@ -308,16 +324,20 @@ function PureStopButton({
   setMessages: Dispatch<SetStateAction<Array<Message>>>;
 }) {
   return (
-    <Button
-      className="rounded-full p-1.5 h-fit border dark:border-zinc-600"
+    <button
+      className={cn(
+        buttonVariants({ variant: 'default' }),
+        'rounded-full p-1.5 h-fit border dark:border-zinc-600'
+      )}
       onClick={(event) => {
         event.preventDefault();
         stop();
         setMessages((messages) => sanitizeUIMessages(messages));
       }}
+      aria-label="stop"
     >
       <StopIcon size={14} />
-    </Button>
+    </button>
   );
 }
 
@@ -333,16 +353,20 @@ function PureSendButton({
   uploadQueue: Array<string>;
 }) {
   return (
-    <Button
-      className="rounded-full p-1.5 h-fit border dark:border-zinc-600"
+    <button
+      className={cn(
+        buttonVariants({ variant: 'default' }),
+        'rounded-full p-1.5 h-fit border dark:border-zinc-600'
+      )}
       onClick={(event) => {
         event.preventDefault();
         submitForm();
       }}
-      disabled={input.length === 0 || uploadQueue.length > 0}
+      disabled={!input.trim() && !uploadQueue.length}
+      aria-label="send"
     >
       <ArrowUpIcon size={14} />
-    </Button>
+    </button>
   );
 }
 

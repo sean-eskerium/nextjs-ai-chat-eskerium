@@ -48,6 +48,7 @@ export function PureMessageActions({
                 await copyToClipboard(message.content as string);
                 toast.success('Copied to clipboard!');
               }}
+              aria-label="copy"
             >
               <CopyIcon />
             </Button>
@@ -102,6 +103,7 @@ export function PureMessageActions({
                   error: 'Failed to upvote response.',
                 });
               }}
+              aria-label="upvote"
             >
               <ThumbUpIcon />
             </Button>
@@ -156,6 +158,7 @@ export function PureMessageActions({
                   error: 'Failed to downvote response.',
                 });
               }}
+              aria-label="downvote"
             >
               <ThumbDownIcon />
             </Button>
