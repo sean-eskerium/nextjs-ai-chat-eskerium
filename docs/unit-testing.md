@@ -1,406 +1,703 @@
-# Unit Testing Documentation
-
-## Overview
-
-This document outlines our unit testing strategy for the application, specifically focused on ensuring component dependencies and imports continue to work correctly during the transition to the Fuse React directory structure.
-
-## Testing Stack
-
-- **Jest**: Our primary testing framework
-- **React Testing Library**: For testing React components
-- **@testing-library/jest-dom**: For additional DOM testing utilities
-- **@testing-library/user-event**: For simulating user interactions
-- **web-streams-polyfill**: For mocking streaming responses in tests
-
-## Test Organization
-
-Our tests are organized in the `__tests__` directory, mirroring the structure of our source code:
-
-```
-__tests__/
-  components/
-    ui/           # UI component tests
-    chat.test.tsx # Chat component tests
-    ...
-  app/
-    api/          # API route tests
-    chat/         # Chat page tests
-  config/        # Test configuration
-    setup.ts     # Global test setup
-```
-
-## Test Driven Development (TDD)
-
-### Overview
-We follow a TDD approach for all new features and modifications. The process is:
-
-1. Write tests first based on expected behavior
-2. Run tests (they should fail)
-3. Implement the feature
-4. Run tests again (they should pass)
-5. Refactor if needed while keeping tests passing
-
-### TDD Process for Different Components
-
-#### API Routes
-```typescript
-// 1. Write the test first
-describe('POST /api/chat', () => {
-  it('handles chat message creation', async () => {
-    const mockRequest = {
-      json: () => Promise.resolve({
-        messages: [{ role: 'user', content: 'Hello' }],
-        id: 'test-chat',
-        modelId: 'test-model',
-      }),
-    };
-
-    const response = await POST(mockRequest as any);
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
-  });
-});
-
-// 2. Implement the route handler
-export async function POST(req: Request) {
-  const body = await req.json();
-  // Implementation follows...
-}
-```
-
-#### React Components
-```typescript
-// 1. Write the test first
-describe('ChatInput', () => {
-  it('submits message on enter', async () => {
-    const onSubmit = jest.fn();
-    render(<ChatInput onSubmit={onSubmit} />);
-    
-    const input = screen.getByRole('textbox');
-    await userEvent.type(input, 'Hello{enter}');
-    
-    expect(onSubmit).toHaveBeenCalledWith('Hello');
-  });
-});
-
-// 2. Implement the component
-export function ChatInput({ onSubmit }: Props) {
-  // Implementation follows...
-}
-```
-
-### TDD Guidelines
-
-1. **Test Structure**
-   - Write descriptive test names that explain the behavior
-   - Group related tests using `describe` blocks
-   - Use `beforeEach` for common setup
-   - Clean up after tests using `afterEach`
-
-2. **Test Coverage**
-   - Aim for 90%+ coverage on new code
-   - Test both success and error cases
-   - Test edge cases and boundary conditions
-
-3. **Mocking Strategy**
-   - Mock external dependencies
-   - Use Jest's mock functions for callbacks
-   - Keep mocks as simple as possible
-
-## Testing Strategy
-
-### 1. Component Import Testing
-
-The primary goal is to ensure components can load their dependencies correctly. Each test should verify:
-
-- Component can be imported
-- Required sub-components are available
-- Props are correctly typed
-- Basic rendering works
-
-### 2. Component Categories
-
-#### UI Components (`components/ui/`)
-- Simple, self-contained components
-- Focus on basic rendering and prop validation
-- Examples: Button, Input, Select
-
-#### Feature Components (`components/`)
-- More complex, composed components
-- Focus on dependency loading and basic functionality
-- Examples: Chat, Message, Editor
-
-### 3. Mock Strategy
-
-We use several types of mocks to isolate components:
-
-#### Global Mocks (in `__tests__/config/setup.ts`)
-```typescript
-// Mock streaming responses
-global.ReadableStream = ReadableStream;
-global.TransformStream = TransformStream;
-global.Response = class extends Object {
-  constructor(body?: BodyInit | null, init?: ResponseInit) {
-    super();
-    Object.assign(this, {
-      status: init?.status || 200,
-      headers: new Headers(init?.headers),
-      body: body,
-    });
-  }
-} as any;
-
-// Mock TextDecoder
-class MockTextDecoder {
-  encoding = 'utf-8';
-  fatal = false;
-  ignoreBOM = false;
-  decode() {
-    return 'test response';
-  }
-}
-global.TextDecoder = MockTextDecoder as any;
-```
-
-#### Component-Level Mocks
-```typescript
-jest.mock('../../components/toolbar', () => ({
-  Toolbar: () => <div data-testid="mock-toolbar" />
-}));
-```
-
-#### API Mocks
-```typescript
-jest.mock('ai', () => {
-  const mockStream = new ReadableStream({
-    start(controller) {
-      controller.enqueue('test response');
-      controller.close();
-    },
-  });
-
-  const mockResponse = new Response(mockStream, {
-    headers: { 'content-type': 'text/plain; charset=utf-8' },
-  });
-  mockResponse.mergeIntoDataStream = jest.fn();
-
-  return {
-    StreamingTextResponse: jest.fn().mockImplementation(() => mockResponse),
-    experimental_StreamData: jest.fn(),
-    // ... other mocks
-  };
-});
-```
-
-## Test Coverage Goals
-
-### Priority 1: Core Components
-- `chat.tsx`
-- `message.tsx`
-- `markdown.tsx`
-- `editor.tsx`
-- All UI components
-- All API routes
-
-### Priority 2: Feature Components
-- `toolbar.tsx`
-- `sidebar-history.tsx`
-- `document.tsx`
-- `block.tsx`
-
-### Priority 3: Utility Components
-- `icons.tsx`
-- `theme-provider.tsx`
-- Other utility components
-
-## Test Implementation Guide
-
-### 1. Basic Component Test Template
-
-```typescript
-import { render, screen } from '@testing-library/react';
-import { ComponentName } from './path-to-component';
-
-describe('ComponentName', () => {
-  it('renders successfully', () => {
-    render(<ComponentName />);
-    // Basic assertions
-  });
-});
-```
-
-### 2. Complex Component Test Template
-
-```typescript
-import { render, screen } from '@testing-library/react';
-import { ComponentName } from './path-to-component';
-
-// Mock dependencies
-jest.mock('./dependency', () => ({
-  DependencyComponent: () => <div data-testid="mock-dependency" />
-}));
-
-describe('ComponentName', () => {
-  const mockProps = {
-    // Define required props
-  };
-
-  beforeEach(() => {
-    // Setup before each test
-    jest.clearAllMocks();
-  });
-
-  it('renders with all dependencies', () => {
-    render(<ComponentName {...mockProps} />);
-    // Verify dependencies are loaded
-  });
-});
-```
-
-### 3. API Route Test Template
-
-```typescript
-import { POST } from './route';
-
-describe('API Route', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('handles successful request', async () => {
-    const mockRequest = {
-      json: () => Promise.resolve({ /* request body */ }),
-    };
-
-    const response = await POST(mockRequest as any);
-    expect(response.status).toBe(200);
-    
-    // For streaming responses
-    const reader = response.body?.getReader();
-    const { value } = await reader?.read() || {};
-    const text = new TextDecoder().decode(value);
-    expect(text).toBe('expected response');
-  });
-});
-```
-
-## Common Testing Patterns
-
-### 1. Provider Components
-
-Components that require providers should be wrapped:
-
-```typescript
-const renderWithProviders = (ui: React.ReactElement) => {
-  return render(
-    <TooltipProvider>
-      {ui}
-    </TooltipProvider>
-  );
-};
-```
-
-### 2. Streaming Response Testing
-
-For components or routes that use streaming:
-
-```typescript
-// Mock streaming response
-const mockStream = new ReadableStream({
-  start(controller) {
-    controller.enqueue('test response');
-    controller.close();
-  },
-});
-
-const mockResponse = new Response(mockStream, {
-  headers: { 'content-type': 'text/plain; charset=utf-8' },
-});
-mockResponse.mergeIntoDataStream = jest.fn();
-```
-
-### 3. Next.js Specific Mocks
-
-```typescript
-// Mock Next.js navigation
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-  }),
-  notFound: jest.fn(),
-}));
-
-// Mock Next.js headers
-jest.mock('next/headers', () => ({
-  cookies: () => ({
-    get: jest.fn(),
-    set: jest.fn(),
-  }),
-  headers: () => new Map(),
-}));
-```
-
-## Test Execution
-
-### Running Tests
-
-```bash
-# Run all tests
-pnpm test
-
-# Run specific test file
-pnpm test path/to/test
-
-# Run tests in watch mode
-pnpm test --watch
-
-# Run tests with coverage
-pnpm test --coverage
-```
-
-### Debugging Tests
-
-1. Use `screen.debug()` to view the rendered DOM
-2. Use `console.log` with `beforeEach` to debug setup
-3. Use Jest's `--verbose` flag for detailed output
-4. Use the debugger statement in tests
-5. Use VS Code's Jest extension for inline debugging
+# Unit Testing Guide
+
+## Goal
+Our goal is to write tests that work correctly on the first attempt by:
+1. Thoroughly understanding the component's implementation before writing any tests
+2. Being familiar with testing library syntax and patterns
+3. Understanding UI library (e.g., Radix UI, Framer Motion) testing requirements
+4. Following a systematic approach to test writing
+5. Ensuring tests are maintainable and reflect real user behavior
+6. Identifying and testing complete interaction flows, not just individual events
+
+## Pre-Testing Analysis Checklist
+
+### Component Architecture Review
+- [ ] Review component's file structure and dependencies
+- [ ] Understand component's role in the application
+- [ ] Map data flow (props, state, context)
+- [ ] Identify integration points with other components
+- [ ] Review component's TypeScript interfaces/types
+- [ ] Understand component's lifecycle and state transitions
+- [ ] Document component's responsibilities
+- [ ] Identify potential refactoring needs
+- [ ] Map out all event handlers and their dependencies
+- [ ] Review any UI library-specific features (Framer Motion, Radix UI, etc.)
+
+### State Management Analysis
+- [ ] Document all state variables and their purposes
+- [ ] Map state transitions and side effects
+- [ ] Identify optimistic updates and loading states
+- [ ] Understand error state handling
+- [ ] Review state initialization
+- [ ] Document state dependencies between components
+- [ ] Map async state updates
+- [ ] Identify state persistence requirements
+- [ ] List conditions required for state changes
+- [ ] Document state prerequisites for callbacks
+
+### UI/UX Flow Analysis
+- [ ] Map all possible user interaction paths
+- [ ] Document expected behavior for each interaction
+- [ ] List all visual states and transitions
+- [ ] Identify accessibility requirements
+- [ ] Document keyboard navigation flows
+- [ ] Map focus management requirements
+- [ ] List animation states and triggers
+- [ ] Document responsive behavior
+- [ ] Identify multi-step interactions
+- [ ] Map out complete interaction sequences
+
+### Technical Dependencies
+- [ ] List all external libraries used
+- [ ] Document UI framework-specific features
+- [ ] Note any custom hooks or utilities
+- [ ] Identify performance considerations
+- [ ] List required providers
+- [ ] Document API dependencies
+- [ ] Map WebSocket interactions
+- [ ] Review build dependencies
+- [ ] Understand animation library requirements
+- [ ] Document testing library limitations
 
 ## Best Practices
 
-1. **Test First Development**
-   - Write tests before implementing features
-   - Use tests to drive the design
-   - Keep tests focused and minimal
+### 1. Component Analysis
+- Read and understand the component's source code completely before writing tests
+- Identify key functionality and state management
+- Note any hooks being used and their impact on testing
+- Identify visual states and transitions
+- Check for accessibility features
+- Understand component hierarchy and parent-child relationships
+- Review event handlers and their side effects
+- Map out component's data flow and state changes
+- Document all conditions that must be met for callbacks
+- Understand the complete interaction flow
 
-2. **Mock Strategy**
-   - Mock external dependencies
-   - Mock complex child components
-   - Keep mocks simple and maintainable
-   - Use Jest's mock functions for callbacks
+### 2. Test Setup
+- Mock hooks properly using jest.mock with requireActual for partial mocks
+- Clear mocks between tests using beforeEach
+- Set up default mock implementations that match expected behavior
+- Use data-testid attributes strategically and sparingly
+- Keep test descriptions clear and behavior-focused
+- Ensure proper test isolation
+- Mock complex UI libraries (e.g., framer-motion) appropriately
+- Handle asynchronous operations correctly
+- Set up all required state conditions
+- Mock complete interaction flows
 
-3. **Maintainability**
-   - Group related tests
-   - Use descriptive test names
-   - Keep test files focused
-   - Update tests when modifying code
+### 3. Test Organization
+- Group related test cases logically
+- Test both initial and state-dependent rendering
+- Verify accessibility attributes and ARIA states
+- Check visual indicators and state changes
+- Test disabled states and user interactions
+- Ensure proper cleanup between tests
+- Test error states and edge cases
+- Verify component integration points
+- Test complete interaction sequences
+- Verify intermediate states during complex interactions
 
-4. **Coverage**
-   - Maintain high coverage for critical paths
-   - Test error conditions
-   - Test edge cases
-   - Don't sacrifice quality for coverage
+## Testing Complex Interactions
 
-## Next Steps
+### Multi-Step Interaction Pattern
+Some components require multiple user interactions to complete an action. When testing these:
 
-1. Complete test coverage for UI components
-2. Add tests for feature components
-3. Add tests for utility functions
-4. Set up CI/CD integration
-5. Implement automated coverage reporting
+1. **Map the Complete Interaction Flow**
+   ```typescript
+   // Example: Reading Level Selector
+   // 1. User opens the selector
+   // 2. User drags to select a level
+   // 3. User clicks to confirm selection
+   ```
+
+2. **Identify State Dependencies**
+   - List all conditions that must be met for callbacks to fire
+   - Document state variables that affect behavior
+   ```typescript
+   // Example: Reading Level Selection
+   // Required conditions:
+   // - currentLevel !== selectedLevel
+   // - hasUserSelectedLevel === true
+   ```
+
+3. **Mock Complex Libraries**
+   When mocking libraries like framer-motion:
+   ```typescript
+   jest.mock('framer-motion', () => ({
+     motion: {
+       div: ({ children, onDragEnd, onClick, ...props }) => (
+         <div
+           onClick={(e) => {
+             // Simulate any state updates that would happen during drag
+             onDragEnd?.({
+               target: { getBoundingClientRect: () => ({ top: 5 }) }
+             });
+             // Then trigger the click handler
+             onClick?.(e);
+           }}
+           {...props}
+         >
+           {children}
+         </div>
+       )
+     },
+     // Mock other necessary exports...
+   }));
+   ```
+
+4. **Test Complete Interaction Sequences**
+   ```typescript
+   it('handles complete interaction flow', async () => {
+     const user = userEvent.setup();
+     render(<Component />);
+
+     // 1. Initial interaction
+     await user.click(screen.getByRole('button'));
+
+     // 2. Simulate intermediate state changes
+     fireEvent.dragEnd(screen.getByTestId('selector'));
+
+     // 3. Complete the interaction
+     await user.click(screen.getByTestId('selector'));
+
+     // 4. Verify the complete flow
+     expect(mockCallback).toHaveBeenCalledWith(expectedArgs);
+   });
+   ```
+
+5. **Common Pitfalls**
+   - Not simulating all required events in the sequence
+   - Missing state prerequisites for callbacks
+   - Incomplete mocking of complex UI libraries
+   - Not verifying intermediate states
+   - Testing individual events instead of complete flows
+
+### Testing Checklist for Complex Interactions
+- [ ] Map out complete user interaction flow
+- [ ] Identify all state dependencies
+- [ ] List required conditions for callbacks
+- [ ] Mock UI libraries to simulate correct behavior
+- [ ] Test complete interaction sequences
+- [ ] Verify intermediate states
+- [ ] Check final callback arguments
+
+## Testing Templates
+
+### Radix UI Components
+```typescript
+describe('RadixComponent', () => {
+  // Standard setup
+  const renderComponent = (props = {}) => {
+    return render(
+      <RadixProvider>
+        <Component {...defaultProps} {...props} />
+      </RadixProvider>
+    );
+  };
+
+  // Standard test cases
+  it('renders in default state', () => {
+    renderComponent();
+    expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('handles user interactions', async () => {
+    const user = userEvent.setup();
+    renderComponent();
+    
+    // Standard interaction pattern
+    const trigger = screen.getByRole('button');
+    await user.click(trigger);
+    
+    // Standard assertions
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+```
+
+### Framer Motion Components
+```typescript
+describe('MotionComponent', () => {
+  // Mock setup
+  beforeAll(() => {
+    jest.mock('framer-motion', () => ({
+      motion: {
+        div: ({ children, onDragEnd, onClick, ...props }) => (
+          <div
+            data-testid="motion-element"
+            onClick={onClick}
+            onDragEnd={onDragEnd}
+            {...props}
+          >
+            {children}
+          </div>
+        )
+      },
+      AnimatePresence: ({ children }) => children,
+      useMotionValue: () => ({
+        set: jest.fn(),
+        get: jest.fn(),
+        onChange: jest.fn()
+      })
+    }));
+  });
+
+  it('handles motion interactions', async () => {
+    const user = userEvent.setup();
+    const mockCallback = jest.fn();
+    
+    render(<MotionComponent onComplete={mockCallback} />);
+    
+    // Test complete interaction sequence
+    const element = screen.getByTestId('motion-element');
+    
+    // Simulate drag
+    fireEvent.dragEnd(element, {
+      target: { getBoundingClientRect: () => ({ top: 100 }) }
+    });
+    
+    // Verify intermediate state
+    expect(element).toHaveStyle({ transform: 'translateY(100px)' });
+    
+    // Complete interaction
+    await user.click(element);
+    
+    // Verify callback
+    expect(mockCallback).toHaveBeenCalledWith(expect.any(Object));
+  });
+});
+```
+
+### Next.js Components
+```typescript
+describe('NextjsComponent', () => {
+  const mockRouter = {
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    query: {},
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useRouter as jest.Mock).mockReturnValue(mockRouter);
+  });
+
+  const renderComponent = (props = {}) => {
+    return render(
+      <SessionProvider>
+        <Component {...defaultProps} {...props} />
+      </SessionProvider>
+    );
+  };
+
+  it('handles navigation correctly', async () => {
+    const user = userEvent.setup();
+    renderComponent();
+
+    await user.click(screen.getByRole('link', { name: 'Navigate' }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/expected-path');
+  });
+});
+```
+
+### React Query Components
+```typescript
+describe('QueryComponent', () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  const renderComponent = (props = {}) => {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <Component {...defaultProps} {...props} />
+      </QueryClientProvider>
+    );
+  };
+
+  it('handles data fetching correctly', async () => {
+    const mockData = { id: 1, name: 'Test' };
+    server.use(
+      rest.get('/api/data', (req, res, ctx) => {
+        return res(ctx.json(mockData));
+      })
+    );
+
+    renderComponent();
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...');
+    expect(await screen.findByText(mockData.name)).toBeInTheDocument();
+  });
+});
+```
+
+## Test Case Design Patterns
+
+### State Machine Pattern
+```typescript
+const states = {
+  initial: {
+    setup: () => render(<Component />),
+    assertions: () => {
+      expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    }
+  },
+  open: {
+    setup: async (user) => {
+      await user.click(screen.getByRole('button'));
+    },
+    assertions: () => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    }
+  },
+  loading: {
+    setup: async (user) => {
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+    },
+    assertions: () => {
+      expect(screen.getByRole('status')).toHaveTextContent('Loading...');
+    }
+  },
+  error: {
+    setup: async (user) => {
+      server.use(
+        rest.post('/api/submit', (req, res, ctx) => {
+          return res(ctx.status(500));
+        })
+      );
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+    },
+    assertions: () => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Error occurred');
+    }
+  }
+};
+
+describe('Component States', () => {
+  Object.entries(states).forEach(([stateName, state]) => {
+    it(`behaves correctly in ${stateName} state`, async () => {
+      const user = userEvent.setup();
+      await state.setup(user);
+      await state.assertions();
+    });
+  });
+});
+```
+
+### Interaction Flow Pattern
+```typescript
+const flows = {
+  simpleClick: {
+    description: 'Single click interaction',
+    steps: [
+      {
+        action: async (user) => {
+          await user.click(screen.getByRole('button'));
+        },
+        assert: () => {
+          expect(screen.getByRole('dialog')).toBeInTheDocument();
+        }
+      }
+    ]
+  },
+  dragAndClick: {
+    description: 'Drag followed by click confirmation',
+    steps: [
+      {
+        action: (element) => {
+          fireEvent.dragEnd(element, {
+            target: { getBoundingClientRect: () => ({ top: 100 }) }
+          });
+        },
+        assert: () => {
+          expect(screen.getByTestId('value-display')).toHaveTextContent('100');
+        }
+      },
+      {
+        action: async (user) => {
+          await user.click(screen.getByTestId('confirm'));
+        },
+        assert: () => {
+          expect(mockCallback).toHaveBeenCalledWith(100);
+        }
+      }
+    ]
+  }
+};
+
+describe('Component Flows', () => {
+  Object.entries(flows).forEach(([flowName, flow]) => {
+    it(`handles ${flow.description}`, async () => {
+      const user = userEvent.setup();
+      const element = render(<Component />);
+      
+      for (const step of flow.steps) {
+        await step.action(user, element);
+        await step.assert();
+      }
+    });
+  });
+});
+```
+
+## Visual Testing Guidelines
+
+### Animation States
+```typescript
+it('handles animation states correctly', async () => {
+  const { container } = render(<AnimatedComponent />);
+  
+  // Initial state
+  expect(container.firstChild).toHaveClass('initial-state');
+  
+  // Trigger animation
+  await userEvent.click(screen.getByRole('button'));
+  
+  // Check transition class
+  expect(container.firstChild).toHaveClass('animating');
+  
+  // Wait for animation completion
+  await waitFor(() => {
+    expect(container.firstChild).toHaveClass('final-state');
+  });
+});
+```
+
+### Layout Testing
+```typescript
+it('handles responsive layout correctly', () => {
+  const { container } = render(<ResponsiveComponent />);
+  
+  // Test mobile layout
+  window.innerWidth = 375;
+  fireEvent(window, new Event('resize'));
+  expect(container.firstChild).toHaveClass('mobile-layout');
+  
+  // Test desktop layout
+  window.innerWidth = 1024;
+  fireEvent(window, new Event('resize'));
+  expect(container.firstChild).toHaveClass('desktop-layout');
+});
+```
+
+## Performance Testing
+
+### Render Performance
+```typescript
+it('renders efficiently', async () => {
+  const renderCount = jest.fn();
+  
+  function TestComponent() {
+    useEffect(renderCount);
+    return <Component />;
+  }
+  
+  render(<TestComponent />);
+  
+  // Trigger state update
+  await userEvent.click(screen.getByRole('button'));
+  
+  // Should only render twice (initial + update)
+  expect(renderCount).toHaveBeenCalledTimes(2);
+});
+```
+
+### Memory Management
+```typescript
+it('cleans up resources properly', () => {
+  const cleanup = jest.fn();
+  jest.spyOn(React, 'useEffect').mockImplementation((cb) => {
+    const cleanupFn = cb();
+    if (cleanupFn) cleanup = cleanupFn;
+  });
+  
+  const { unmount } = render(<Component />);
+  unmount();
+  
+  expect(cleanup).toHaveBeenCalled();
+});
+```
+
+## Error Handling Matrix
+
+| Scenario | Expected Behavior | Test Approach | Example |
+|----------|------------------|---------------|---------|
+| Network Error | Show error message | Mock failed request | `mockFetch.mockRejectedValue(new Error())` |
+| Invalid Input | Display validation | Simulate invalid input | `await user.type(input, '!@#')` |
+| Timeout | Show retry option | Mock timeout | `jest.advanceTimersByTime(5000)` |
+| Server Error | Display error state | Mock error response | `res(ctx.status(500))` |
+| Validation Error | Show field errors | Submit invalid form | `expect(screen.getByRole('alert')).toBeInTheDocument()` |
+| Auth Error | Redirect to login | Mock auth failure | `expect(mockRouter.push).toHaveBeenCalledWith('/login')` |
+
+## Integration Testing Boundaries
+
+### Unit vs Integration Tests
+- Unit tests focus on isolated component behavior
+- Integration tests verify component interactions
+- System tests check full feature workflows
+- End-to-end tests validate complete user journeys
+
+### Mock Strategies
+```typescript
+// Prefer partial mocks
+jest.mock('./module', () => ({
+  ...jest.requireActual('./module'),
+  specificFunction: jest.fn()
+}));
+
+// Use mock implementations
+const mockImplementation = jest.fn().mockImplementation((value) => {
+  if (typeof value !== 'string') {
+    throw new Error('Invalid input');
+  }
+  return value.toUpperCase();
+});
+
+// Mock complex dependencies
+jest.mock('next/router', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    query: {},
+  }),
+}));
+```
+
+## Test Maintenance
+
+### Code Review Checklist
+- [ ] Tests follow naming conventions
+- [ ] Mocks are properly typed
+- [ ] Error cases are covered
+- [ ] Performance implications considered
+- [ ] Accessibility tests included
+- [ ] Test isolation maintained
+- [ ] Proper cleanup implemented
+- [ ] Documentation updated
+
+### Test Refactoring Patterns
+```typescript
+// Extract common setup
+const setup = (props = {}) => {
+  const user = userEvent.setup();
+  const utils = render(<Component {...defaultProps} {...props} />);
+  return {
+    user,
+    ...utils,
+  };
+};
+
+// Create test utilities
+const fillForm = async (user: UserEvent, data: FormData) => {
+  for (const [field, value] of Object.entries(data)) {
+    await user.type(screen.getByLabelText(field), value);
+  }
+};
+
+// Implement test factories
+const createMockUser = (overrides = {}) => ({
+  id: 1,
+  name: 'Test User',
+  email: 'test@example.com',
+  ...overrides,
+});
+```
+
+## Troubleshooting Decision Tree
+
+```mermaid
+graph TD
+    A[Test Failure] --> B{Element Found?}
+    B -->|No| C[Check Rendering]
+    B -->|Yes| D{Interaction Failed?}
+    C --> E[Use screen.debug]
+    C --> F[Check Conditions]
+    C --> G[Use findBy]
+    D -->|Yes| H[Check Event Setup]
+    D -->|No| I{Assertion Failed?}
+    H --> J[Verify userEvent]
+    H --> K[Check Async]
+    I -->|Yes| L[Compare Expected]
+    I -->|No| M[Check Side Effects]
+    L --> N[Log State]
+    L --> O[Check Types]
+```
+
+## Test-Driven Development
+
+### TDD Workflow
+1. Write failing test
+2. Implement minimum code to pass
+3. Refactor while keeping tests green
+4. Repeat for next feature
+
+### TDD Example
+```typescript
+// 1. Write failing test
+it('submits form data', async () => {
+  const onSubmit = jest.fn();
+  const { user } = setup({ onSubmit });
+  
+  await fillForm(user, { name: 'Test' });
+  await user.click(screen.getByRole('button', { name: 'Submit' }));
+  
+  expect(onSubmit).toHaveBeenCalledWith({ name: 'Test' });
+});
+
+// 2. Implement component
+function Form({ onSubmit }) {
+  const [data, setData] = useState({ name: '' });
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(data);
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        value={data.name}
+        onChange={(e) => setData({ name: e.target.value })}
+      />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+## Testing Metrics
+
+### Coverage Goals
+- Line Coverage: >90%
+- Branch Coverage: >85%
+- Function Coverage: >90%
+- Statement Coverage: >90%
+
+### Quality Metrics
+- Test Reliability: <1% flaky tests
+- Test Performance: <5s per test
+- Maintenance Ratio: <1:3 test:code
+- Coverage Trend: Increasing or stable
 
 ## Conclusion
 
-This testing strategy ensures our components and features are thoroughly tested using a TDD approach. The tests serve as both documentation and a safety net, quickly identifying any issues during development and refactoring. 
+Writing effective tests requires:
+1. Thorough understanding of the component
+2. Proper test setup and organization
+3. Following established patterns and best practices
+4. Understanding UI library testing requirements
+5. Proper handling of async operations
+6. Good debugging practices
+
+Remember to:
+- Focus on testing behavior, not implementation
+- Write maintainable and readable tests
+- Use appropriate queries and assertions
+- Handle edge cases and error states
+- Test accessibility features
+- Keep tests isolated and independent 

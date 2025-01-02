@@ -13,7 +13,7 @@ const config: Config = {
   },
   testMatch: ['**/__tests__/**/*.test.[jt]s?(x)'],
   transformIgnorePatterns: [
-    'node_modules/(?!(nanoid|@radix-ui|@ai-sdk|ai|web-streams-polyfill|pretty-bytes|trim-lines|markdown-table|escape-string-regexp|unified|unist-.*|vfile.*|bail|is-plain-obj|trough|remark-.*|mdast-util-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|react-markdown)/)',
+    'node_modules/(?!(nanoid|next-auth|@radix-ui|@ai-sdk|ai|web-streams-polyfill|pretty-bytes|trim-lines|markdown-table|escape-string-regexp|unified|unist-.*|vfile.*|bail|is-plain-obj|trough|remark-.*|mdast-util-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|react-markdown)/)',
   ],
   moduleDirectories: ['node_modules', '<rootDir>'],
   transform: {
