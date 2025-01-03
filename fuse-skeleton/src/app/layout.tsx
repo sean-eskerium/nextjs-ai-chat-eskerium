@@ -3,10 +3,10 @@ import 'src/styles/splash-screen.css';
 import 'src/styles/app-base.css';
 import 'src/styles/app-components.css';
 import 'src/styles/app-utilities.css';
-import { SessionProvider } from 'next-auth/react';
 import { auth } from '@auth/authJs';
 import generateMetadata from '../utils/generateMetadata';
 import App from './App';
+import { SessionProvider } from "next-auth/react";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const metadata = await generateMetadata({
@@ -69,10 +69,7 @@ export default async function RootLayout({
 				id="root"
 				className={clsx('loading')}
 			>
-				<SessionProvider
-					basePath="/auth"
-					session={session}
-				>
+				<SessionProvider session={session}>
 					<App>{children}</App>
 				</SessionProvider>
 			</body>

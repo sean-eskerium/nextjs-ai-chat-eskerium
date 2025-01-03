@@ -23,9 +23,9 @@
       "@schema": [
         "./src/@schema"
       ],
-    "@/*": [
-      "./src/*"
-    ]
+      "@/*": [
+        "./src/*"
+      ]
     },
     "declaration": true,
     "target": "esnext",

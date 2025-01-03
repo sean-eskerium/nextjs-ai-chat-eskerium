@@ -19,6 +19,15 @@ const nextConfig = {
 			});
 		}
 
+		config.externals = [
+			...(config.externals || []),
+			'net',
+			'tls',
+			'crypto',
+			'perf_hooks',
+			'stream'
+		];
+
 		return config;
 	}
 };

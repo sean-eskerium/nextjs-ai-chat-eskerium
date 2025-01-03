@@ -1,38 +1,26 @@
 import { User } from '@auth/user';
-import UserModel from '@auth/user/models/UserModel';
-import { PartialDeep } from 'type-fest';
-import apiFetch from '@/utils/apiFetch';
 
-/**
- * Get user by id
- */
-export async function authGetDbUser(userId: string): Promise<Response> {
-	return apiFetch(`/api/mock/auth/user/${userId}`);
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+
+export async function authGetDbUserByEmail(email: string) {
+	const res = await fetch(`${BASE_URL}/api/auth/db?email=${encodeURIComponent(email)}`);
+	if (!res.ok) {
+		throw new Error('Failed to fetch user');
+	}
+	const data = await res.json();
+	return data;
 }
 
-/**
- * Get user by email
- */
-export async function authGetDbUserByEmail(email: string): Promise<Response> {
-	return apiFetch(`/api/mock/auth/user-by-email/${email}`);
-}
-
-/**
- * Update user
- */
-export function authUpdateDbUser(user: PartialDeep<User>) {
-	return apiFetch(`/api/mock/auth/user/${user.id}`, {
+export async function authUpdateDbUser(userData: Partial<User>) {
+	const res = await fetch(`${BASE_URL}/api/auth/db`, {
 		method: 'PUT',
-		body: JSON.stringify(UserModel(user))
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify(userData),
 	});
-}
-
-/**
- * Create user
- */
-export async function authCreateDbUser(user: PartialDeep<User>) {
-	return apiFetch('/api/mock/users', {
-		method: 'POST',
-		body: JSON.stringify(UserModel(user))
-	});
+	if (!res.ok) {
+		throw new Error('Failed to update user');
+	}
+	return res.json();
 }
