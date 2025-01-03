@@ -1,42 +1,45 @@
 import { auth } from '@auth/authJs';
- 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const { nextUrl } = req;
-  
-  // Allow public routes and assets
-  const publicPaths = [
-    '/sign-in',
-    '/assets',
-    '/api/auth',
-    '/_next',
-    '/favicon.ico'
-  ];
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-  if (publicPaths.some(path => nextUrl.pathname.startsWith(path))) {
-    return null;
-  }
+export default async function middleware(request: NextRequest) {
+    const session = await auth();
+    const pathname = request.nextUrl.pathname;
 
-  // Protect all other routes
-  if (!isLoggedIn) {
-    const signInUrl = new URL('/sign-in', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001');
-    return Response.redirect(signInUrl);
-  }
+    // Handle API routes
+    if (pathname.startsWith('/api/')) {
+        // Skip auth check for auth-related API routes
+        if (pathname.startsWith('/api/auth/')) {
+            return NextResponse.next();
+        }
 
-  return null;
-});
+        // For other API routes, check auth and return proper error response
+        if (!session) {
+            return NextResponse.json(
+                { error: 'Authentication required' },
+                { status: 401 }
+            );
+        }
 
-// Configure which routes to protect
+        return NextResponse.next();
+    }
+
+    // Handle web routes
+    if (!session) {
+        // Exclude sign-in and sign-up pages from auth check
+        if (pathname === '/sign-in' || pathname === '/sign-up') {
+            return NextResponse.next();
+        }
+
+        // Redirect to sign-in page for other routes
+        const signInUrl = new URL('/sign-in', request.url);
+        signInUrl.searchParams.set('callbackUrl', pathname);
+        return NextResponse.redirect(signInUrl);
+    }
+
+    return NextResponse.next();
+}
+
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api/auth (NextAuth routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - assets (public assets)
-     */
-    '/((?!api/auth|_next/static|_next/image|favicon.ico|assets).*)'
-  ]
+    matcher: ['/', '/:id', '/api/:path*', '/sign-in', '/sign-up']
 };

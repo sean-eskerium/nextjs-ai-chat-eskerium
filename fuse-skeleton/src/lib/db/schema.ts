@@ -16,7 +16,6 @@ export const user = pgTable('User', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
   email: varchar('email', { length: 64 }).notNull(),
   password: varchar('password', { length: 64 }),
-  name: varchar('name', { length: 255 }),
   role: text('role').array().$type<string[]>().default(sql`ARRAY['user']::text[]`),
   displayName: varchar('displayName', { length: 255 }),
   photoURL: varchar('photoURL', { length: 255 }),

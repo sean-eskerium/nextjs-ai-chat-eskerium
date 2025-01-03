@@ -43,6 +43,13 @@
       "when": 1735876012922,
       "tag": "0005_free_luminals",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1735935153348,
+      "tag": "0006_silky_major_mapleleaf",
+      "breakpoints": true
     }
   ]
 }
