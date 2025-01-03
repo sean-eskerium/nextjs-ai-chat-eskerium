@@ -1,0 +1,1 @@
+ALTER TABLE "User" ALTER COLUMN "role" SET DEFAULT ARRAY['user']::text[];

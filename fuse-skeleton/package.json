@@ -110,9 +110,10 @@
     "dotenv": "16.4.5"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
+    "dev:debug":"DEBUG=next:* npm run dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "eslint ./src --config ./eslint.config.mjs",
     "lint:fix": "eslint --fix ./src --config ./eslint.config.mjs",
     "postinstall": "node src/utils/node-scripts/fuse-react-message.js",

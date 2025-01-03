@@ -3,10 +3,10 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 export default {
-  schema: './src/lib/db/models/*.ts',
+  schema: './src/lib/db/schema.ts',
   out: './src/lib/db/migrations',
   driver: 'pg',
   dbCredentials: {
-    connectionString: process.env.DATABASE_URL!,
+    connectionString: process.env.POSTGRES_URL!,
   },
 } satisfies Config; 

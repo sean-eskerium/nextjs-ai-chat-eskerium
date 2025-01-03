@@ -10,13 +10,29 @@ const nextConfig = {
 		// your project has type errors.
 		ignoreBuildErrors: true
 	},
-	webpack: (config) => {
+	webpack: (config, { isServer }) => {
+		// Handle raw imports
 		if (config.module && config.module.rules) {
 			config.module.rules.push({
 				test: /\.(json|js|ts|tsx|jsx)$/,
 				resourceQuery: /raw/,
 				use: 'raw-loader'
 			});
+		}
+
+		// Handle Node.js modules
+		if (!isServer) {
+			config.resolve.fallback = {
+				...config.resolve.fallback,
+				fs: false,
+				os: false,
+				path: false,
+				net: false,
+				tls: false,
+				crypto: false,
+				dns: false,
+				child_process: false,
+			};
 		}
 
 		config.externals = [
@@ -29,6 +45,15 @@ const nextConfig = {
 		];
 
 		return config;
+	},
+	transpilePackages: ['@fuse/core'],
+	modularizeImports: {
+		'@mui/material': {
+			transform: '@mui/material/{{member}}'
+		},
+		'@mui/icons-material': {
+			transform: '@mui/icons-material/{{member}}'
+		}
 	}
 };
 

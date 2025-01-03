@@ -11,6 +11,7 @@ import Link from '@fuse/core/Link';
 import Button from '@mui/material/Button';
 import { signIn } from 'next-auth/react';
 import { Alert } from '@mui/material';
+import { useRouter } from 'next/navigation';
 import signinErrors from './signinErrors';
 
 /**
@@ -37,6 +38,7 @@ const defaultValues = {
 };
 
 function AuthJsCredentialsSignInForm() {
+	const router = useRouter();
 	const { control, formState, handleSubmit, setValue, setError } = useForm<FormType>({
 		mode: 'onChange',
 		defaultValues,
@@ -59,11 +61,28 @@ function AuthJsCredentialsSignInForm() {
 	async function onSubmit(formData: FormType) {
 		const { email, password } = formData;
 
+		console.log('SignInForm - Starting sign-in process:', {
+			email,
+			NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+			NEXTAUTH_URL: process.env.NEXTAUTH_URL
+		});
+
+		const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+		const callbackUrl = `${baseUrl}/example`;
+
+		console.log('SignInForm - Using callback URL:', callbackUrl);
+
 		const result = await signIn('credentials', {
 			email,
 			password,
 			formType: 'signin',
-			redirect: false
+			redirect: false,
+			callbackUrl
+		});
+
+		console.log('SignInForm - Sign-in result:', {
+			error: result?.error,
+			url: result?.url
 		});
 
 		if (result?.error) {
@@ -71,6 +90,8 @@ function AuthJsCredentialsSignInForm() {
 			return false;
 		}
 
+		console.log('SignInForm - Redirecting to dashboard');
+		router.push('/example');
 		return true;
 	}
 

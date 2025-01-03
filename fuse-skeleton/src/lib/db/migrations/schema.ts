@@ -1,13 +1,7 @@
-import { pgTable, uuid, varchar, foreignKey, timestamp, text, boolean, json, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, uuid, timestamp, text, boolean, varchar, json, primaryKey } from "drizzle-orm/pg-core"
   import { sql } from "drizzle-orm"
 
 
-
-export const user = pgTable("User", {
-	id: uuid("id").defaultRandom().primaryKey().notNull(),
-	email: varchar("email", { length: 64 }).notNull(),
-	password: varchar("password", { length: 64 }),
-});
 
 export const suggestion = pgTable("Suggestion", {
 	id: uuid("id").defaultRandom().primaryKey().notNull(),
@@ -44,6 +38,21 @@ export const chat = pgTable("Chat", {
 	userId: uuid("userId").notNull().references(() => user.id),
 	title: text("title").notNull(),
 	visibility: varchar("visibility").default('private').notNull(),
+});
+
+export const user = pgTable("User", {
+	id: uuid("id").defaultRandom().primaryKey().notNull(),
+	email: varchar("email", { length: 64 }).notNull(),
+	password: varchar("password", { length: 64 }),
+	name: varchar("name", { length: 255 }),
+	role: text("role").default(ARRAY['user'::text]).array(),
+	displayName: varchar("displayName", { length: 255 }),
+	photoUrl: varchar("photoURL", { length: 255 }),
+	emailVerified: timestamp("emailVerified", { mode: 'string' }),
+	image: text("image"),
+	data: json("data").default('{"shortcuts": []}'::jsonb),
+	createdAt: timestamp("createdAt", { mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updatedAt", { mode: 'string' }).defaultNow(),
 });
 
 export const vote = pgTable("Vote", {

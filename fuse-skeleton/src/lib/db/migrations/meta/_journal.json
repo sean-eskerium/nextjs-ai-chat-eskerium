@@ -8,6 +8,41 @@
       "when": 1735869650753,
       "tag": "0000_low_supreme_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1735875244103,
+      "tag": "0001_aberrant_mephistopheles",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1735875275256,
+      "tag": "0002_icy_aaron_stack",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1735875422329,
+      "tag": "0003_robust_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1735875591312,
+      "tag": "0004_minor_thor_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1735876012922,
+      "tag": "0005_free_luminals",
+      "breakpoints": true
     }
   ]
 }
