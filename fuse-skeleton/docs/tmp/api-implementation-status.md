@@ -1,5 +1,19 @@
 # API Implementation Status
 
+## Initial Prompt for Assistant
+I am working on refactoring and implementing a new API structure in a Next.js application using Redux Toolkit Query. I have access to:
+1. The Fuse React demo codebase at [provide path or URL]
+2. The Fuse React documentation at [provide URL]
+3. The current implementation progress tracked in this file
+
+The goal is to refactor the existing API into a new structure while maintaining functionality. We've already:
+- Set up the directory structure
+- Implemented error handling
+- Created the base API configuration
+- Set up the authentication service
+
+Please help me continue the implementation by analyzing the demo codebase and documentation to ensure we follow the same patterns and best practices. The next step is to [specify what you want to work on next].
+
 ## Completed Tasks
 - [x] Created necessary directories for new API structure:
   - `src/app/api/v1`
