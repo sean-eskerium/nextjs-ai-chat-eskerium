@@ -6,6 +6,17 @@
         "dry_run_default": true,
         "prevent_workspace_change": true,
         "require_full_analysis": true,
+        "workspace_validation": {
+          "verify_current_directory": "Always verify and confirm the current working directory before making changes",
+          "check_file_paths": "Ensure file paths are relative to the correct project directory",
+          "prevent_root_creation": "Prevent creating files in root directory when project-specific paths are intended"
+        },
+        "code_quality": {
+          "wait_for_linter": "Always wait for and verify linter results before proceeding with additional changes",
+          "sequential_editing": "Edit files in dependency order to prevent reference errors",
+          "type_safety": "Ensure type definitions are created/updated before their implementations",
+          "verify_changes": "Check that previous changes were successful before proceeding"
+        },
         "analysis_requirements": {
           "trace_data_flow": "Always trace the complete data flow from source to destination before making changes",
           "verify_dependencies": "Check all files that import or depend on the file being modified",
@@ -14,12 +25,13 @@
           "state_management": "Verify how state changes affect the entire component tree"
         },
         "pre_modification_checklist": [
+          "Verify current working directory",
           "Identify all connected components and services",
           "Review edge function contracts and response formats",
           "Check state management implications",
           "Verify type definitions and interfaces",
           "Analyze potential side effects",
-          "Review and update affected tests"
+          "Ensure proper file paths relative to project root"
         ]
       },
       "sequential_task_flow": true,
@@ -32,9 +44,14 @@
           "project_requirements_document.md",
           "tech_stack_document.md",
           "frontend_architecture_document.md",
-          "file_structure_document.md",
-          "unit-testing.md"
-        ]
+          "file_structure_document.md"
+        ],
+        "status_tracking": {
+          "maintain_status_file": true,
+          "status_file_location": "docs/project/status",
+          "track_progress": true,
+          "include_next_steps": true
+        }
       }
     },
     "coding_practices": {
@@ -42,7 +59,19 @@
         "environment": {
           "require_confirmation_before_install": true,
           "preserve_working_setup": true,
-          "backup_config_before_changes": true
+          "backup_config_before_changes": true,
+          "verify_directory_structure": true
+        },
+        "code_organization": {
+          "dependency_order": "Implement and modify files in order of their dependencies",
+          "type_first": "Create/update type definitions before implementation",
+          "verify_imports": "Check import paths and dependencies before implementation"
+        },
+        "error_handling": {
+          "wait_for_linter": true,
+          "max_retry_attempts": 3,
+          "require_error_resolution": true,
+          "prevent_cascading_errors": true
         },
         "supabase": {
           "use_docker_hub": true,
