@@ -422,33 +422,138 @@ From the documentation, when connecting to a real backend:
 
 ## 4. Proposed Architecture
 
-### 4.1 Directory Structure
+### 4.1 Directory Structure (Aligned with Fuse React)
+
 ```
 /src
-  /app
-    /api              # Next.js API Routes (thin handlers)
-      /v1             # Version control
-        /auth         # Auth-related routes
-        /users        # User-related routes
-        /[other]      # Other domain routes
-  /server            # Server-side code
-    /api             # API logic
-      /handlers      # Route handlers
-      /middleware    # API middleware
-      /validation    # Request validation
-    /db              # Database
-      /models        # Database models
-      /migrations    # Database migrations
-      /schema        # Schema definitions
-    /services        # Business logic
-      /auth          # Auth service
-      /users         # User service
-      /[other]       # Other services
-  /store             # Client-side state
-    /api             # API integration
-      /services      # API services
-      /hooks         # API hooks
+  /app                    # Next.js App Router
+    /api                  # API Routes
+      /v1
+        /auth            # Auth-related routes
+        /users           # User-related routes
+        /[other]         # Other domain routes
+    /(features)          # Feature-based organization
+      /users
+        /models          # User-related models
+        /services        # User-specific services
+      /auth
+        /models          # Auth-related models
+        /services        # Auth-specific services
+      /[other-features]  # Other feature modules
+  /lib                   # Shared utilities
+    /db                  # Database utilities
+      /migrations        # Database migrations
+      /schema           # Database schema
+    /api                 # Shared API utilities
+      /middleware       # API middleware
+      /validation       # Validation utilities
+  /store                # Redux store
+    /api                # Redux Toolkit API
+      /services         # API service definitions
+      /hooks           # Custom API hooks
 ```
+
+#### Directory Structure Rationale
+
+1. **Feature-Based Organization**
+   - Follows Fuse React's pattern of organizing code by feature
+   - Models and services live close to their features
+   - Clear boundaries between different domains
+
+2. **API Route Structure**
+   - Clean separation of API routes in `/app/api/v1`
+   - Version control built into the URL structure
+   - Matches Fuse React's API organization
+
+3. **Shared Utilities**
+   - Common utilities in `/lib` directory
+   - Database and API utilities separated
+   - Reusable across features
+
+4. **Redux Integration**
+   - Follows Fuse React's Redux Toolkit patterns
+   - Centralized API service configuration
+   - Feature-specific API hooks
+
+#### Fuse React Alignment
+
+1. **Route Handlers**
+   ```typescript
+   // /src/app/api/v1/users/route.ts
+   import { UserService } from '@/app/users/services/userService'
+   import { withErrorHandling } from '@/lib/api/middleware/errorMiddleware'
+
+   export const GET = withErrorHandling(async (request: Request) => {
+     const service = new UserService()
+     const users = await service.getUsers()
+     return Response.json({ data: users })
+   })
+   ```
+
+2. **Feature Models**
+   ```typescript
+   // /src/app/users/models/UserModel.ts
+   import { z } from 'zod'
+   import { BaseModel } from '@/lib/api/models/baseModel'
+
+   export const UserSchema = z.object({
+     email: z.string().email(),
+     displayName: z.string(),
+     // ... other fields
+   })
+
+   export type User = z.infer<typeof UserSchema>
+   ```
+
+3. **Feature Services**
+   ```typescript
+   // /src/app/users/services/userService.ts
+   import { db } from '@/lib/db'
+   import { User } from '../models/UserModel'
+
+   export class UserService {
+     async getUsers(): Promise<User[]> {
+       // Implementation
+     }
+   }
+   ```
+
+4. **API Integration**
+   ```typescript
+   // /src/store/api/services/userApi.ts
+   import { baseApi } from '../baseApi'
+   import { User } from '@/app/users/models/UserModel'
+
+   export const userApi = baseApi.injectEndpoints({
+     endpoints: (build) => ({
+       getUsers: build.query<User[], void>({
+         query: () => 'users'
+       })
+     })
+   })
+   ```
+
+#### Key Benefits of This Structure
+
+1. **Fuse React Compatibility**
+   - Follows Fuse React's patterns and conventions
+   - Easy integration with Fuse components
+   - Compatible with Fuse's state management
+
+2. **Next.js Best Practices**
+   - App Router organization
+   - Server Components support
+   - API route optimization
+
+3. **Developer Experience**
+   - Clear feature boundaries
+   - Easy to locate related code
+   - Consistent patterns
+
+4. **Scalability**
+   - New features easily added
+   - Clear upgrade path
+   - Maintainable structure
 
 ### 4.2 Implementation Examples
 
@@ -883,141 +988,171 @@ export const {
 ### 5.4 Test-Driven Rollout Plan
 
 #### Phase 1: API Foundation (Week 1)
-1. **Base Error Types & Middleware** (Day 1)
-   - Create error classes
-   - Implement error middleware
-   - Write tests for error handling
-   - ✓ Test: Error middleware correctly handles different error types
-   - 🔒 Commit: "Add error handling foundation"
-
-2. **Base Model Structure** (Day 1-2)
-   - Create base model interfaces
-   - Implement user model
-   - Write model validation tests
-   - ✓ Test: Models properly validate data
-   - 🔒 Commit: "Add base model structure"
-
-3. **Base API Service** (Day 2-3)
+1. **Base API Configuration** (Day 1)
    - Set up Redux Toolkit base configuration
-   - Implement base query setup
-   - Write API service tests
-   - ✓ Test: Base API configuration works with mock endpoints
-   - 🔒 Commit: "Add base API service"
+   - Create error types and middleware
+   - Write API configuration tests
+   - ✓ Test: Base API configuration works
+   - 🔒 Commit: "Add base API configuration"
 
-4. **Handler Templates** (Day 3-4)
-   - Create base handler class
-   - Implement user handler
-   - Write handler tests
-   - ✓ Test: Handlers properly process requests
-   - 🔒 Commit: "Add handler templates"
+2. **Feature Models** (Day 2)
+   - Create base model types
+   - Set up Zod schemas
+   - Implement model validation
+   - ✓ Test: Model validation works
+   - 🔒 Commit: "Add feature models"
+
+3. **Feature Services** (Day 3)
+   - Create service interfaces
+   - Implement core services
+   - Write service tests
+   - ✓ Test: Services work with models
+   - 🔒 Commit: "Add feature services"
+
+4. **Route Handlers** (Day 4)
+   - Set up API route structure
+   - Implement basic handlers
+   - Write route tests
+   - ✓ Test: Routes work with services
+   - 🔒 Commit: "Add route handlers"
 
 5. **Integration Test** (Day 5)
-   - Test all Phase 1 components together
-   - Fix any integration issues
-   - ✓ Test: Complete flow from API call to response
+   - Test full feature flow
+   - Verify error handling
+   - Check type safety
+   - ✓ Test: End-to-end feature works
    - 🔒 Commit: "Phase 1 integration complete"
 
-#### Phase 2: Route Implementation (Week 2)
-1. **Auth Routes** (Day 1)
-   - Implement auth routes
-   - Write auth route tests
-   - ✓ Test: Auth flow works end-to-end
-   - 🔒 Commit: "Add auth routes"
+#### Phase 2: Feature Implementation (Week 2)
+1. **Auth Feature** (Day 1-2)
+   ```
+   /app/(features)/auth
+     /models
+       /AuthModel.ts
+     /services
+       /authService.ts
+   /app/api/v1/auth
+     /[...nextauth]/route.ts
+   ```
+   - ✓ Test: Auth flow works
+   - 🔒 Commit: "Add auth feature"
 
-2. **User Routes** (Day 2)
-   - Implement user CRUD routes
-   - Write user route tests
-   - ✓ Test: User operations work end-to-end
-   - 🔒 Commit: "Add user routes"
+2. **User Feature** (Day 2-3)
+   ```
+   /app/(features)/users
+     /models
+       /UserModel.ts
+     /services
+       /userService.ts
+   /app/api/v1/users
+     /route.ts
+     /[id]/route.ts
+   ```
+   - ✓ Test: User operations work
+   - 🔒 Commit: "Add user feature"
 
-3. **Database Layer** (Day 3-4)
-   - Implement database service
-   - Create repositories
-   - Write database tests
-   - ✓ Test: Database operations work correctly
-   - 🔒 Commit: "Add database layer"
+3. **Database Integration** (Day 3-4)
+   ```
+   /lib/db
+     /schema.ts
+     /migrations
+     /client.ts
+   ```
+   - ✓ Test: Database operations work
+   - 🔒 Commit: "Add database integration"
 
-4. **Service Layer** (Day 4-5)
-   - Implement service interfaces
-   - Create concrete services
-   - Write service tests
-   - ✓ Test: Services properly handle business logic
-   - 🔒 Commit: "Add service layer"
+4. **API Services** (Day 4-5)
+   ```
+   /store/api
+     /services
+       /authApi.ts
+       /userApi.ts
+     /hooks
+       /useAuth.ts
+       /useUser.ts
+   ```
+   - ✓ Test: API services work
+   - 🔒 Commit: "Add API services"
 
 5. **Integration Test** (Day 5)
-   - Test all Phase 2 components together
-   - Verify database operations
-   - ✓ Test: Complete flow from route to database
+   - Test all features together
+   - Verify data flow
+   - Check error cases
+   - ✓ Test: All features work together
    - 🔒 Commit: "Phase 2 integration complete"
 
 #### Phase 3: Enhancement & Security (Week 3)
-1. **Validation Layer** (Day 1)
-   - Implement Zod schemas
-   - Create validators
-   - Write validation tests
-   - ✓ Test: Input validation works correctly
-   - 🔒 Commit: "Add validation layer"
+1. **Input Validation** (Day 1)
+   ```
+   /lib/api/validation
+     /schemas
+     /middleware
+   ```
+   - ✓ Test: All inputs validated
+   - 🔒 Commit: "Add input validation"
 
-2. **Security Middleware** (Day 2)
-   - Implement auth checks
-   - Add rate limiting
-   - Write security tests
-   - ✓ Test: Security measures work properly
-   - 🔒 Commit: "Add security middleware"
+2. **Security Layer** (Day 2)
+   ```
+   /lib/api/middleware
+     /auth.ts
+     /rateLimit.ts
+   ```
+   - ✓ Test: Security measures work
+   - 🔒 Commit: "Add security layer"
 
-3. **Error Enhancement** (Day 3)
-   - Improve error messages
-   - Add error logging
-   - Write error handling tests
-   - ✓ Test: Enhanced error handling works
+3. **Error Handling** (Day 3)
+   ```
+   /lib/api/errors
+     /types.ts
+     /handlers.ts
+   ```
+   - ✓ Test: Errors handled properly
    - 🔒 Commit: "Enhance error handling"
 
 4. **Documentation** (Day 4)
-   - Add API documentation
-   - Write type documentation
-   - Generate API docs
-   - ✓ Test: Documentation is accurate
+   - API documentation
+   - Type documentation
+   - Usage examples
+   - ✓ Test: Docs are accurate
    - 🔒 Commit: "Add documentation"
 
-5. **Final Integration** (Day 5)
-   - End-to-end testing
+5. **Final Testing** (Day 5)
    - Performance testing
-   - Load testing
-   - ✓ Test: System meets all requirements
-   - 🔒 Commit: "Final integration complete"
+   - Security testing
+   - Integration testing
+   - ✓ Test: All requirements met
+   - 🔒 Commit: "Final testing complete"
 
 ### Testing Checkpoints
 
-Each phase has specific testing requirements that must pass before moving to the next phase:
-
 #### Phase 1 Checkpoints
-- [ ] Error middleware handles all error types
-- [ ] Models validate correctly
-- [ ] API service configuration works
-- [ ] Handlers process requests properly
-- [ ] Phase 1 integration tests pass
+- [ ] Base API configuration works
+- [ ] Feature models validate correctly
+- [ ] Services handle business logic
+- [ ] Routes return correct responses
+- [ ] Phase 1 integration passes
 
 #### Phase 2 Checkpoints
-- [ ] Auth routes work end-to-end
-- [ ] User routes handle CRUD operations
-- [ ] Database operations work correctly
-- [ ] Services handle business logic
-- [ ] Phase 2 integration tests pass
+- [ ] Auth feature works end-to-end
+- [ ] User feature works end-to-end
+- [ ] Database operations succeed
+- [ ] API services work correctly
+- [ ] Phase 2 integration passes
 
 #### Phase 3 Checkpoints
-- [ ] Input validation catches all cases
-- [ ] Security measures prevent unauthorized access
-- [ ] Error handling provides useful feedback
-- [ ] Documentation matches implementation
-- [ ] Final integration tests pass
+- [ ] Input validation catches errors
+- [ ] Security measures work
+- [ ] Error handling works
+- [ ] Documentation is complete
+- [ ] Final integration passes
 
 ### Git Workflow
 
 Each commit should:
-1. Include relevant tests
-2. Pass all existing tests
-3. Include documentation updates
-4. Have a clear commit message
+1. Include feature-specific tests
+2. Pass existing test suite
+3. Update relevant documentation
+4. Follow conventional commits
 5. Tag major phase completions
 
 ## 6. Considerations
