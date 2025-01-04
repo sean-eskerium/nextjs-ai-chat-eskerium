@@ -68,10 +68,11 @@
     "./src/**/*.ts",
     "./src/**/*.tsx",
     "./src/global.d.ts",
-    "tailwind.config.ts",
-    "next-env.d.ts",
     ".next/types/**/*.ts",
+    "build/types/**/*.ts",
+    "next-env.d.ts",
     "next.config.mjs",
-    "build/types/**/*.ts"
+    "tailwind.config.ts",
+    "./.next/types/**/*.ts"
   ]
 }

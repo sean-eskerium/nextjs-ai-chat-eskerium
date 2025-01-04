@@ -1,11 +1,13 @@
-import { compare } from 'bcrypt-ts';
-import NextAuth, { type Session, type NextAuthConfig } from 'next-auth';
+import NextAuth from 'next-auth';
+import { User } from '@auth/user';
+import type { NextAuthConfig } from 'next-auth';
 import type { Provider } from 'next-auth/providers';
+import type { AdapterUser, AdapterAccount, AdapterSession } from '@auth/core/adapters';
 import Credentials from 'next-auth/providers/credentials';
-import Google from 'next-auth/providers/google';
 import Facebook from 'next-auth/providers/facebook';
-import { findUserByEmail } from '@/lib/db/users';
-import type { User } from '@auth/user';
+import Google from 'next-auth/providers/google';
+import { DrizzleAdapter } from '@auth/drizzle-adapter';
+import { getDb } from '@/lib/db/query';
 import { authGetDbUserByEmail, authCreateDbUser } from './authApi';
 import { FetchApiError } from '@/utils/apiFetch';
 
@@ -16,39 +18,101 @@ export const providers: Provider[] = [
 			password: { label: "Password", type: "password" }
 		},
 		async authorize(formInput: any) {
+			/**
+			 * Sign in validation
+			 */
 			if (formInput.formType === 'signin') {
-				const user = await findUserByEmail(formInput.email);
-				if (!user) return null;
-
-				if (!formInput.password || !user.password) return null;
-
-				const passwordMatch = await compare(formInput.password, user.password);
-				if (!passwordMatch) return null;
-
-				return {
-					id: user.id,
-					email: user.email,
-					name: user.displayName || user.email,
-					image: user.photoURL
-				};
-			}
-
-			if (formInput.formType === 'signup') {
-				if (formInput.password === '' || formInput.email === '') {
+				if (!formInput.password || !formInput.email) {
 					return null;
 				}
 			}
 
-			return null;
-		},
+			/**
+			 * Sign up validation
+			 */
+			if (formInput.formType === 'signup') {
+				if (!formInput.password || !formInput.email) {
+					return null;
+				}
+			}
+
+			/**
+			 * Return email for session
+			 */
+			return {
+				email: formInput.email
+			};
+		}
 	}),
-	// Commented out until configured
-	// Google,
-	// Facebook
+	Google,
+	Facebook
 ];
 
 const config = {
 	theme: { logo: '/assets/images/logo/logo.svg' },
+	adapter: {
+		async createUser(data): Promise<AdapterUser> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			const result = await adapter.createUser(data);
+			if (!result) throw new Error('Failed to create user');
+			return result;
+		},
+		async getUser(id): Promise<AdapterUser | null> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			return adapter.getUser(id);
+		},
+		async getUserByEmail(email): Promise<AdapterUser | null> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			return adapter.getUserByEmail(email);
+		},
+		async updateUser(data): Promise<AdapterUser> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			const result = await adapter.updateUser(data);
+			if (!result) throw new Error('Failed to update user');
+			return result;
+		},
+		async deleteUser(userId): Promise<void> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			await adapter.deleteUser(userId);
+		},
+		async linkAccount(account): Promise<void> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			await adapter.linkAccount(account);
+		},
+		async unlinkAccount(providerAccountId): Promise<void> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			await adapter.unlinkAccount(providerAccountId);
+		},
+		async getSessionAndUser(sessionToken): Promise<{ user: AdapterUser; session: AdapterSession } | null> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			return adapter.getSessionAndUser(sessionToken);
+		},
+		async createSession(data): Promise<AdapterSession> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			const result = await adapter.createSession(data);
+			if (!result) throw new Error('Failed to create session');
+			return result;
+		},
+		async updateSession(data): Promise<AdapterSession | null> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			return adapter.updateSession(data);
+		},
+		async deleteSession(sessionToken): Promise<void> {
+			const db = await getDb();
+			const adapter = DrizzleAdapter(await db);
+			await adapter.deleteSession(sessionToken);
+		}
+	},
 	pages: {
 		signIn: '/sign-in'
 	},
@@ -57,9 +121,6 @@ const config = {
 	trustHost: true,
 	callbacks: {
 		authorized() {
-			/** Checkout information to how to use middleware for authorization
-			 * https://next-auth.js.org/configuration/nextjs#middleware
-			 */
 			return true;
 		},
 		jwt({ token, trigger, account, user }) {
@@ -80,9 +141,6 @@ const config = {
 
 			if (session) {
 				try {
-					/**
-					 * Get the session user from database
-					 */
 					const response = await authGetDbUserByEmail(session.user.email);
 					const userDbData = await response.json() as User;
 					session.db = userDbData;
@@ -90,11 +148,10 @@ const config = {
 				} catch (error) {
 					const errorStatus = (error as FetchApiError).status;
 
-					/** If user not found, create a new user */
 					if (errorStatus === 404) {
 						const newUserResponse = await authCreateDbUser({
 							email: session.user.email,
-							role: ['admin'],
+							role: ['user'],  // Default to user role
 							displayName: session.user.name,
 							photoURL: session.user.image
 						});
@@ -107,6 +164,7 @@ const config = {
 					throw error;
 				}
 			}
+
 			return null;
 		}
 	},

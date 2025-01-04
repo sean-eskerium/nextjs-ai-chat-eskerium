@@ -6,6 +6,20 @@ export default async function middleware(request: NextRequest) {
     const session = await auth();
     const pathname = request.nextUrl.pathname;
 
+    // Block any chat-app specific routes
+    if (pathname.startsWith('/api/vote') || pathname.startsWith('/api/history')) {
+        return NextResponse.json(
+            { error: 'Route not found' },
+            { status: 404 }
+        );
+    }
+
+    // Public routes that don't require authentication
+    const publicRoutes = ['/sign-in', '/sign-up', '/auth', '/assets'];
+    if (publicRoutes.some(route => pathname.startsWith(route))) {
+        return NextResponse.next();
+    }
+
     // Handle API routes
     if (pathname.startsWith('/api/')) {
         // Skip auth check for auth-related API routes
@@ -24,14 +38,8 @@ export default async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // Handle web routes
+    // Handle protected routes
     if (!session) {
-        // Exclude sign-in and sign-up pages from auth check
-        if (pathname === '/sign-in' || pathname === '/sign-up') {
-            return NextResponse.next();
-        }
-
-        // Redirect to sign-in page for other routes
         const signInUrl = new URL('/sign-in', request.url);
         signInUrl.searchParams.set('callbackUrl', pathname);
         return NextResponse.redirect(signInUrl);
@@ -40,6 +48,16 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.next();
 }
 
+// Match all routes except static files and public assets
 export const config = {
-    matcher: ['/', '/:id', '/api/:path*', '/sign-in', '/sign-up']
+    matcher: [
+        /*
+         * Match all request paths except:
+         * 1. /api/auth/* (auth endpoints)
+         * 2. /_next/* (Next.js internals)
+         * 3. /fonts/* (inside public directory)
+         * 4. /favicon.ico, /sitemap.xml (public files)
+         */
+        '/((?!api/auth|_next|fonts|favicon.ico|sitemap.xml).*)',
+    ],
 };

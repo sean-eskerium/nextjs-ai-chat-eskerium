@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 function MainPage() {
-	redirect(`/example`);
+	redirect(`/(control-panel)/example`);
 	return null;
 }
 
